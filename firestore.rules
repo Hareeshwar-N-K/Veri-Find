@@ -1,0 +1,248 @@
+rules_version = '2';
+
+// VeriFind - Firebase Security Rules
+// Trust-based Lost & Found Platform
+// 
+// SECURITY PRINCIPLES:
+// 1. found_items are PRIVATE - only visible to creator and admins
+// 2. lost_items are semi-public - basic info visible, ownershipHints hidden
+// 3. matches require verification before full access
+// 4. All sensitive actions are logged to audit_logs
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is the owner of the document
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Get user document
+    // Get user document - returns null if doesn't exist
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Check if user document exists
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+    
+    // Check if user is admin
+    function isAdmin() {
+      return isAuthenticated() && userExists() && getUserData().role == 'admin';
+    }
+    
+    // Check if user is moderator or admin
+    function isModerator() {
+      return isAuthenticated() && userExists() && getUserData().role in ['admin', 'moderator'];
+    }
+    
+    // Check if user is not suspended (new users without profile are allowed)
+    function isNotSuspended() {
+      return isAuthenticated() && (!userExists() || getUserData().isSuspended != true);
+    }
+    
+    // Validate required fields exist
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+    
+    // Check if only allowed fields are being updated
+    function onlyUpdating(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+    
+    // ============================================
+    // 1️⃣ USERS COLLECTION
+    // ============================================
+    match /users/{userId} {
+      // Anyone can read basic user profiles
+      allow read: if isAuthenticated();
+      
+      // Users can create their own profile on first login
+      allow create: if isOwner(userId) 
+        && hasRequiredFields(['uid', 'email', 'displayName', 'role', 'createdAt'])
+        && request.resource.data.role == 'user'  // Can't self-assign admin
+        && request.resource.data.isSuspended == false;
+      
+      // Users can update their own profile (limited fields)
+      allow update: if isOwner(userId) 
+        && onlyUpdating(['displayName', 'photoURL', 'lastActiveAt', 'updatedAt'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'reputationScore', 'badges', 'isSuspended']);
+      
+      // Admins can update any user (including role, suspension)
+      allow update: if isAdmin();
+      
+      // No one can delete users (soft delete via isSuspended)
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // 2️⃣ FOUND_ITEMS COLLECTION (PRIVATE VAULT)
+    // ============================================
+    match /found_items/{itemId} {
+      // ❌ PUBLIC CANNOT READ - Only creator or admin/moderator
+      allow read: if isAuthenticated() 
+        && (resource.data.finderId == request.auth.uid || isModerator());
+      
+      // ✅ Authenticated users can create found items
+      allow create: if isAuthenticated() 
+        && isNotSuspended()
+        && hasRequiredFields(['finderId', 'category', 'title', 'description', 'locationFound', 'currentStorageLocation', 'status', 'createdAt'])
+        && request.resource.data.finderId == request.auth.uid
+        && request.resource.data.status == 'pending'
+        && request.resource.data.isPrivate == true;
+      
+      // Finder can update their own item (limited fields)
+      allow update: if isOwner(resource.data.finderId)
+        && isNotSuspended()
+        && onlyUpdating(['title', 'description', 'currentStorageLocation', 'images', 'updatedAt'])
+        && request.resource.data.finderId == resource.data.finderId; // Can't change finder
+      
+      // Admins/Moderators can update status and other fields
+      allow update: if isModerator();
+      
+      // Only admins can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // 3️⃣ LOST_ITEMS COLLECTION (Semi-Public)
+    // ============================================
+    match /lost_items/{itemId} {
+      // ✅ Authenticated users can read lost items (for browsing)
+      // Note: ownershipHints should be filtered out in queries
+      allow read: if isAuthenticated();
+      
+      // ✅ Authenticated users can create lost items
+      allow create: if isAuthenticated()
+        && isNotSuspended()
+        && hasRequiredFields(['ownerId', 'category', 'title', 'description', 'locationLost', 'dateLost', 'status', 'createdAt'])
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status == 'searching';
+      
+      // Owner can update their own item
+      allow update: if isOwner(resource.data.ownerId)
+        && isNotSuspended()
+        && request.resource.data.ownerId == resource.data.ownerId; // Can't change owner
+      
+      // Admins/Moderators can update
+      allow update: if isModerator();
+      
+      // Owner or admin can delete
+      allow delete: if isOwner(resource.data.ownerId) || isAdmin();
+    }
+    
+    // ============================================
+    // 4️⃣ MATCHES COLLECTION (Intelligence Layer)
+    // ============================================
+    match /matches/{matchId} {
+      // Only participants (owner/finder) and moderators can read
+      allow read: if isAuthenticated()
+        && (resource.data.ownerId == request.auth.uid 
+            || resource.data.finderId == request.auth.uid 
+            || isModerator());
+      
+      // Only Cloud Functions (admin SDK) should create matches
+      // Frontend cannot create matches directly
+      allow create: if false; // Enforced via Cloud Functions
+      
+      // Owner can update to submit quiz answer
+      allow update: if isOwner(resource.data.ownerId)
+        && isNotSuspended()
+        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'updatedAt'])
+        && resource.data.status == 'quiz_sent'; // Can only answer when quiz is sent
+      
+      // Finder can update limited fields
+      allow update: if isOwner(resource.data.finderId)
+        && isNotSuspended()
+        && onlyUpdating(['adminNotes', 'updatedAt']);
+      
+      // Admins/Moderators can update status
+      allow update: if isModerator();
+      
+      // Only admins can delete
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // 5️⃣ RECOVERY_LEDGER (Public Wall of Fame)
+    // ============================================
+    match /recovery_ledger/{entryId} {
+      // ✅ Anyone authenticated can read (public success stories)
+      allow read: if isAuthenticated();
+      
+      // Only Cloud Functions can create/update/delete
+      allow create, update, delete: if false;
+    }
+    
+    // ============================================
+    // 6️⃣ AUDIT_LOGS (Security Records)
+    // ============================================
+    match /audit_logs/{logId} {
+      // Only admins can read audit logs
+      allow read: if isAdmin();
+      
+      // Only Cloud Functions can create audit logs
+      allow create: if false; // Created via Admin SDK
+      
+      // No one can update or delete audit logs
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // 7️⃣ CHAT_CHANNELS (Post-Verification)
+    // ============================================
+    match /chat_channels/{channelId} {
+      // Only participants can read
+      allow read: if isAuthenticated()
+        && request.auth.uid in resource.data.participants;
+      
+      // Only Cloud Functions create channels (after match approval)
+      allow create: if false;
+      
+      // Participants can update lastMessageAt
+      allow update: if isAuthenticated()
+        && request.auth.uid in resource.data.participants
+        && onlyUpdating(['lastMessageAt', 'lastMessage']);
+      
+      // Admin can close channels
+      allow update: if isAdmin();
+      
+      allow delete: if false;
+    }
+    
+    // Chat Messages subcollection
+    match /chat_channels/{channelId}/messages/{messageId} {
+      // Participants can read messages
+      allow read: if isAuthenticated()
+        && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
+      
+      // Participants can send messages
+      allow create: if isAuthenticated()
+        && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants
+        && request.resource.data.senderId == request.auth.uid
+        && get(/databases/$(database)/documents/chat_channels/$(channelId)).data.isActive == true;
+      
+      // No editing or deleting messages
+      allow update, delete: if false;
+    }
+    
+    // ============================================
+    // DENY ALL OTHER COLLECTIONS
+    // ============================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

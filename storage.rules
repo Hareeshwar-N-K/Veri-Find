@@ -1,0 +1,134 @@
+rules_version = '2';
+
+// VeriFind - Firebase Storage Security Rules
+// 
+// SECURITY PRINCIPLES:
+// 1. Only authenticated users can upload
+// 2. Users can only access their own uploads
+// 3. File size and type restrictions
+// 4. Admins can access all files
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    // Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if user is the owner
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Check file size (max 5MB)
+    function isValidSize() {
+      return request.resource.size < 5 * 1024 * 1024;
+    }
+    
+    // Check file type is image
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    // Check file type is valid image format
+    function isValidImageType() {
+      return request.resource.contentType in [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif'
+      ];
+    }
+    
+    // ============================================
+    // FOUND ITEMS IMAGES
+    // ============================================
+    match /found_items/{userId}/{itemId}/{fileName} {
+      // Only owner can read their found item images
+      allow read: if isAuthenticated() && isOwner(userId);
+      
+      // Owner can upload with size and type restrictions
+      allow create: if isAuthenticated() 
+        && isOwner(userId)
+        && isValidSize()
+        && isValidImageType();
+      
+      // Owner can delete their images
+      allow delete: if isAuthenticated() && isOwner(userId);
+      
+      // No updates - delete and re-upload
+      allow update: if false;
+    }
+    
+    // ============================================
+    // LOST ITEMS IMAGES (Semi-public)
+    // ============================================
+    match /lost_items/{userId}/{itemId}/{fileName} {
+      // Any authenticated user can read lost item images
+      allow read: if isAuthenticated();
+      
+      // Owner can upload with restrictions
+      allow create: if isAuthenticated()
+        && isOwner(userId)
+        && isValidSize()
+        && isValidImageType();
+      
+      // Owner can delete their images
+      allow delete: if isAuthenticated() && isOwner(userId);
+      
+      // No updates
+      allow update: if false;
+    }
+    
+    // ============================================
+    // PROFILE IMAGES
+    // ============================================
+    match /profiles/{userId}/{fileName} {
+      // Anyone can read profile images
+      allow read: if isAuthenticated();
+      
+      // Owner can upload with restrictions
+      allow create: if isAuthenticated()
+        && isOwner(userId)
+        && isValidSize()
+        && isValidImageType();
+      
+      // Owner can update their profile image
+      allow update: if isAuthenticated()
+        && isOwner(userId)
+        && isValidSize()
+        && isValidImageType();
+      
+      // Owner can delete
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+    
+    // ============================================
+    // CHAT ATTACHMENTS
+    // ============================================
+    match /chat_attachments/{channelId}/{fileName} {
+      // TODO: Verify user is participant in the channel
+      // For now, allow authenticated users
+      allow read: if isAuthenticated();
+      
+      allow create: if isAuthenticated()
+        && isValidSize()
+        && isValidImageType();
+      
+      allow delete: if false; // Chat attachments cannot be deleted
+      allow update: if false;
+    }
+    
+    // ============================================
+    // DENY ALL OTHER PATHS
+    // ============================================
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

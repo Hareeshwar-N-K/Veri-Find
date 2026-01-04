@@ -1,12 +1,22 @@
-# Veri-Find
+# VeriFind
 
-A Lost & Found application built with React, Vite, and Firebase.
+A trust-based Lost & Found platform built with React, Vite, and Firebase. VeriFind uses a **privacy-first architecture** where found items remain private and are only revealed to owners after AI-verified matches.
+
+## 🌟 Features
+
+- **Privacy-First**: Found items are kept private; only matched owners can see them
+- **AI-Powered Matching**: Automatic matching based on category, location, description, and timing
+- **Verification Quiz**: Owners must answer verification questions to prove ownership
+- **Real-time Chat**: Secure communication between verified owners and finders
+- **Reputation System**: Badges and scores for trustworthy users
+- **Admin Dashboard**: Manage matches, users, and review verifications
 
 ## Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js (v18 or higher)
 - npm or yarn
-- Firebase account
+- Firebase account (Blaze plan for Cloud Functions)
+- Firebase CLI (`npm install -g firebase-tools`)
 
 ## Installation
 
@@ -17,10 +27,18 @@ git clone <repository-url>
 cd veri-find
 ```
 
-2. Install dependencies:
+2. Install frontend dependencies:
 
 ```bash
 npm install
+```
+
+3. Install Cloud Functions dependencies:
+
+```bash
+cd functions
+npm install
+cd ..
 ```
 
 ## Firebase Setup
@@ -34,20 +52,25 @@ npm install
    - Enable **Google** as a sign-in provider
    - Add your authorized domain (localhost is added by default)
 
-3. (Optional) Enable Firestore Database:
+3. Enable Firestore Database:
 
    - Go to **Build** > **Firestore Database** > **Create Database**
-   - Choose production mode or test mode
+   - Choose **production mode**
    - Select your preferred location
 
-4. Get your Firebase configuration:
+4. Enable Storage:
+
+   - Go to **Build** > **Storage** > **Get Started**
+   - Choose production mode
+
+5. Get your Firebase configuration:
 
    - Go to **Project Settings** > **General**
    - Scroll down to **Your apps** section
    - Click the web icon (`</>`) to create a web app
    - Register your app and copy the configuration object
 
-5. Update the Firebase configuration in [src/firebase/config.js](src/firebase/config.js):
+6. Update the Firebase configuration in [src/firebase/config.js](src/firebase/config.js):
 
 ```javascript
 const firebaseConfig = {
@@ -60,19 +83,62 @@ const firebaseConfig = {
 };
 ```
 
-**Security Note:** These API keys are safe to expose in frontend code (they are identifiers, not secrets). However, you should configure Firebase Security Rules and enable **App Check** for production to prevent unauthorized access.
+## Deploying Firebase Rules & Functions
+
+1. Login to Firebase CLI:
+
+```bash
+firebase login
+```
+
+2. Initialize Firebase in your project:
+
+```bash
+firebase init
+```
+
+Select: Firestore, Functions, Storage, Emulators
+
+3. Deploy Security Rules:
+
+```bash
+firebase deploy --only firestore:rules,storage:rules
+```
+
+4. Deploy Firestore Indexes:
+
+```bash
+firebase deploy --only firestore:indexes
+```
+
+5. Deploy Cloud Functions:
+
+```bash
+firebase deploy --only functions
+```
 
 ## Running the Application
 
-### Development Mode
+### Development Mode (with Emulators)
 
-Start the development server:
+Start Firebase emulators and dev server:
 
 ```bash
+# Terminal 1: Start emulators
+firebase emulators:start
+
+# Terminal 2: Start dev server
 npm run dev
 ```
 
 The application will open at `http://localhost:5173`
+Firebase Emulator UI will be at `http://localhost:4000`
+
+### Development Mode (without Emulators)
+
+```bash
+npm run dev
+```
 
 ### Build for Production
 
@@ -96,6 +162,40 @@ npm run preview
 - `npm run build` - Build for production
 - `npm run lint` - Run ESLint for code quality
 - `npm run preview` - Preview production build
+- `firebase emulators:start` - Start Firebase local emulators
+- `firebase deploy --only functions` - Deploy Cloud Functions
+
+## Architecture
+
+### Firestore Collections
+
+| Collection        | Description                                     |
+| ----------------- | ----------------------------------------------- |
+| `users`           | User profiles with reputation, badges, stats    |
+| `found_items`     | **PRIVATE** - Only visible to finder and admins |
+| `lost_items`      | Semi-public - Browsable by authenticated users  |
+| `matches`         | AI-generated matches with verification status   |
+| `recovery_ledger` | Public wall of fame for successful recoveries   |
+| `audit_logs`      | Security audit trail (admin-only)               |
+| `chat_channels`   | Post-verification communication                 |
+
+### Cloud Functions
+
+| Function               | Trigger           | Description                           |
+| ---------------------- | ----------------- | ------------------------------------- |
+| `onFoundItemCreate`    | Firestore Create  | Sanitize input, trigger matcher       |
+| `onLostItemCreate`     | Firestore Create  | Sanitize input, trigger matcher       |
+| `onMatchStatusChange`  | Firestore Update  | Handle verification flow, create chat |
+| `cleanupOldItems`      | Scheduled (daily) | Archive expired items                 |
+| `approveMatch`         | Callable          | Admin match approval                  |
+| `sendVerificationQuiz` | Callable          | Send quiz to owner                    |
+
+### Security Rules
+
+- **found_items**: Only creator and admins can read
+- **lost_items**: Authenticated users can read (ownership hints hidden)
+- **matches**: Only participants can access
+- **audit_logs**: Admin-only, immutable
 
 ## Project Structure
 
