@@ -1,16 +1,102 @@
-# React + Vite
+# Veri-Find
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A Lost & Found application built with React, Vite, and Firebase.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- Node.js (v16 or higher)
+- npm or yarn
+- Firebase account
 
-## React Compiler
+## Installation
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Clone the repository:
 
-## Expanding the ESLint configuration
+```bash
+git clone <repository-url>
+cd veri-find
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+2. Install dependencies:
+
+```bash
+npm install
+```
+
+## Firebase Setup
+
+1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
+
+2. Enable Firebase Authentication and Firestore Database in your project
+
+3. Get your Firebase configuration from Project Settings > General > Your apps
+
+4. Update the Firebase configuration in `src/firebase/config.js`:
+
+```javascript
+const firebaseConfig = {
+  apiKey: "your-api-key",
+  authDomain: "your-auth-domain",
+  projectId: "your-project-id",
+  storageBucket: "your-storage-bucket",
+  messagingSenderId: "your-messaging-sender-id",
+  appId: "your-app-id",
+};
+```
+
+## Running the Application
+
+### Development Mode
+
+Start the development server:
+
+```bash
+npm run dev
+```
+
+The application will open at `http://localhost:5173`
+
+### Build for Production
+
+Create a production build:
+
+```bash
+npm run build
+```
+
+### Preview Production Build
+
+Preview the production build locally:
+
+```bash
+npm run preview
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run lint` - Run ESLint for code quality
+- `npm run preview` - Preview production build
+
+## Project Structure
+
+```
+veri-find/
+├── src/
+│   ├── components/    # Reusable components
+│   ├── pages/         # Page components
+│   ├── firebase/      # Firebase configuration
+│   ├── assets/        # Static assets
+│   └── App.jsx        # Main App component
+├── public/            # Public assets
+└── package.json       # Project dependencies
+```
+
+## Tech Stack
+
+- React 19
+- Vite 7
+- TailwindCSS 4
+- React Router 7
+- Firebase
