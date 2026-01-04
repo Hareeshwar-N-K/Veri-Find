@@ -27,11 +27,27 @@ npm install
 
 1. Create a Firebase project at [Firebase Console](https://console.firebase.google.com/)
 
-2. Enable Firebase Authentication and Firestore Database in your project
+2. Enable Firebase Authentication:
 
-3. Get your Firebase configuration from Project Settings > General > Your apps
+   - Go to **Build** > **Authentication** > **Get Started**
+   - Click on **Sign-in method** tab
+   - Enable **Google** as a sign-in provider
+   - Add your authorized domain (localhost is added by default)
 
-4. Update the Firebase configuration in `src/firebase/config.js`:
+3. (Optional) Enable Firestore Database:
+
+   - Go to **Build** > **Firestore Database** > **Create Database**
+   - Choose production mode or test mode
+   - Select your preferred location
+
+4. Get your Firebase configuration:
+
+   - Go to **Project Settings** > **General**
+   - Scroll down to **Your apps** section
+   - Click the web icon (`</>`) to create a web app
+   - Register your app and copy the configuration object
+
+5. Update the Firebase configuration in [src/firebase/config.js](src/firebase/config.js):
 
 ```javascript
 const firebaseConfig = {
@@ -43,6 +59,8 @@ const firebaseConfig = {
   appId: "your-app-id",
 };
 ```
+
+**Security Note:** These API keys are safe to expose in frontend code (they are identifiers, not secrets). However, you should configure Firebase Security Rules and enable **App Check** for production to prevent unauthorized access.
 
 ## Running the Application
 
@@ -99,4 +117,12 @@ veri-find/
 - Vite 7
 - TailwindCSS 4
 - React Router 7
-- Firebase
+- Firebase Authentication (Google OAuth)
+
+## Features
+
+- 🔐 Google OAuth authentication via Firebase
+- 🎨 Modern UI with TailwindCSS
+- ⚡ Fast development with Vite
+- 🔄 Client-side routing with React Router
+- 📱 Responsive design
