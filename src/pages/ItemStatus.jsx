@@ -309,7 +309,11 @@ const ItemStatus = () => {
             {item.images && item.images.length > 0 && (
               <div className="mb-6">
                 <img
-                  src={item.images[0]}
+                  src={
+                    typeof item.images[0] === "string"
+                      ? item.images[0]
+                      : item.images[0]?.url
+                  }
                   alt={item.title}
                   className="w-full max-w-md h-auto rounded-lg shadow-md"
                 />

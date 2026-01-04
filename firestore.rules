@@ -91,9 +91,10 @@ service cloud.firestore {
     // 2️⃣ FOUND_ITEMS COLLECTION (PRIVATE VAULT)
     // ============================================
     match /found_items/{itemId} {
-      // ❌ PUBLIC CANNOT READ - Only creator or admin/moderator
-      allow read: if isAuthenticated() 
-        && (resource.data.finderId == request.auth.uid || isModerator());
+      // Finder, moderators, or any authenticated user (for matching) can read
+      // Note: For true privacy, matching should be done server-side, but for free tier
+      // we allow authenticated users to read found items for client-side matching
+      allow read: if isAuthenticated();
       
       // ✅ Authenticated users can create found items
       allow create: if isAuthenticated() 

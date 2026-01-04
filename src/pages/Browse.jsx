@@ -247,7 +247,11 @@ const Browse = () => {
               {item.images && item.images.length > 0 ? (
                 <div className="h-48 bg-gray-100">
                   <img
-                    src={item.images[0]}
+                    src={
+                      typeof item.images[0] === "string"
+                        ? item.images[0]
+                        : item.images[0]?.url
+                    }
                     alt={item.title}
                     className="w-full h-full object-cover"
                   />
