@@ -4,12 +4,13 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // Your web app's Firebase configuration
 // (Copy this object from Firebase Console > Project Settings > General > Your Apps)
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
+  apiKey: "AIzaSyCTuF42aPpB8TtaO37AUkBiH4YcsmzDEq8",
+  authDomain: "veri-find.firebaseapp.com",
+  projectId: "veri-find",
+  storageBucket: "veri-find.firebasestorage.app",
+  messagingSenderId: "185683499960",
+  appId: "1:185683499960:web:f356238251fcdb3e450d4d",
+  measurementId: "G-1LTK3VZC4V",
 };
 
 // Initialize Firebase

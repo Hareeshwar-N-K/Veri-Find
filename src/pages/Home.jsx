@@ -1,7 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 
 function Home() {
+  const { currentUser } = useAuth();
+
   const features = [
     {
       icon: (
@@ -81,8 +84,27 @@ function Home() {
             <span className="inline-block px-4 py-2 rounded-full bg-blue-100 text-blue-700 text-sm font-medium mb-6">
               🔍 Campus Lost & Found Platform
             </span>
+            {currentUser && (
+              <div className="mb-6 flex items-center justify-center space-x-3">
+                <img
+                  src={
+                    currentUser.photoURL ||
+                    "https://ui-avatars.com/api/?name=" +
+                      encodeURIComponent(currentUser.displayName || "User")
+                  }
+                  alt={currentUser.displayName}
+                  className="w-12 h-12 rounded-full border-2 border-blue-500"
+                />
+                <p className="text-lg text-gray-600">
+                  Welcome back,{" "}
+                  <span className="font-semibold text-blue-600">
+                    {currentUser.displayName?.split(" ")[0]}!
+                  </span>
+                </p>
+              </div>
+            )}
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
-              Lost Something?
+              {currentUser ? "Ready to Find Your Item?" : "Lost Something?"}
               <span className="block bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                 We'll Help You Find It.
               </span>
