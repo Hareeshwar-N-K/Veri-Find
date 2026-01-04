@@ -13,6 +13,8 @@ import {
   FiBell,
   FiClock,
   FiArrowRight,
+  FiAward,
+  FiStar,
 } from "react-icons/fi";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase/config";
@@ -25,6 +27,54 @@ import {
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
+
+// Badge calculation based on reputation points
+const getBadgeInfo = (points) => {
+  if (points >= 500) {
+    return {
+      name: "Legend",
+      color: "text-yellow-500",
+      bgColor: "bg-yellow-100",
+      borderColor: "border-yellow-300",
+      icon: "🏆",
+      nextLevel: null,
+      progress: 100,
+    };
+  } else if (points >= 200) {
+    return {
+      name: "Guardian",
+      color: "text-purple-600",
+      bgColor: "bg-purple-100",
+      borderColor: "border-purple-300",
+      icon: "🛡️",
+      nextLevel: "Legend",
+      pointsToNext: 500 - points,
+      progress: ((points - 200) / 300) * 100,
+    };
+  } else if (points >= 50) {
+    return {
+      name: "Scout",
+      color: "text-blue-600",
+      bgColor: "bg-blue-100",
+      borderColor: "border-blue-300",
+      icon: "🔍",
+      nextLevel: "Guardian",
+      pointsToNext: 200 - points,
+      progress: ((points - 50) / 150) * 100,
+    };
+  } else {
+    return {
+      name: "Newbie",
+      color: "text-gray-600",
+      bgColor: "bg-gray-100",
+      borderColor: "border-gray-300",
+      icon: "🌱",
+      nextLevel: "Scout",
+      pointsToNext: 50 - points,
+      progress: (points / 50) * 100,
+    };
+  }
+};
 
 const Profile = () => {
   const { user } = useAuth();
@@ -117,8 +167,58 @@ const Profile = () => {
     );
   }
 
+  const reputationPoints = profile?.reputationPoints || 0;
+  const badgeInfo = getBadgeInfo(reputationPoints);
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
+      {/* Reputation Banner */}
+      <div
+        className={`mb-6 p-4 rounded-xl ${badgeInfo.bgColor} border ${badgeInfo.borderColor}`}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center space-x-4">
+            <div className="text-4xl">{badgeInfo.icon}</div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className={`text-xl font-bold ${badgeInfo.color}`}>
+                  {badgeInfo.name}
+                </span>
+                <span className="text-sm text-gray-600">
+                  • {reputationPoints} points
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {badgeInfo.nextLevel
+                  ? `${badgeInfo.pointsToNext} points to ${badgeInfo.nextLevel}`
+                  : "Maximum rank achieved! 🎉"}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 text-sm text-gray-600">
+            <FiStar className="w-4 h-4 text-yellow-500" />
+            <span>Earn points by helping return lost items</span>
+          </div>
+        </div>
+        {/* Progress bar */}
+        {badgeInfo.nextLevel && (
+          <div className="mt-3">
+            <div className="w-full bg-white/50 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full transition-all duration-500 ${
+                  badgeInfo.name === "Newbie"
+                    ? "bg-gray-500"
+                    : badgeInfo.name === "Scout"
+                    ? "bg-blue-500"
+                    : "bg-purple-500"
+                }`}
+                style={{ width: `${badgeInfo.progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">My Profile</h1>
         <p className="text-gray-600">
@@ -339,6 +439,79 @@ const Profile = () => {
                   {myMatches.filter((m) => m.status === "recovered").length}
                 </p>
                 <p className="text-sm text-gray-600">Returned</p>
+              </div>
+            </div>
+
+            {/* Reputation Stats */}
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FiAward className="w-5 h-5 text-yellow-500" />
+                Reputation Progress
+              </h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-yellow-50 to-orange-50 border border-yellow-200">
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {reputationPoints}
+                  </p>
+                  <p className="text-xs text-gray-600">Total Points</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200">
+                  <p className="text-2xl font-bold text-green-600">
+                    {profile?.itemsReturned || 0}
+                  </p>
+                  <p className="text-xs text-gray-600">Items Returned</p>
+                </div>
+                <div className="text-center p-3 rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {profile?.itemsRecovered || 0}
+                  </p>
+                  <p className="text-xs text-gray-600">Items Recovered</p>
+                </div>
+              </div>
+
+              {/* Badge Tiers */}
+              <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-xs font-medium text-gray-500 mb-2">
+                  Badge Tiers
+                </p>
+                <div className="flex justify-between text-xs">
+                  <span
+                    className={
+                      reputationPoints >= 0
+                        ? "text-gray-700 font-medium"
+                        : "text-gray-400"
+                    }
+                  >
+                    🌱 Newbie (0)
+                  </span>
+                  <span
+                    className={
+                      reputationPoints >= 50
+                        ? "text-blue-600 font-medium"
+                        : "text-gray-400"
+                    }
+                  >
+                    🔍 Scout (50)
+                  </span>
+                  <span
+                    className={
+                      reputationPoints >= 200
+                        ? "text-purple-600 font-medium"
+                        : "text-gray-400"
+                    }
+                  >
+                    🛡️ Guardian (200)
+                  </span>
+                  <span
+                    className={
+                      reputationPoints >= 500
+                        ? "text-yellow-600 font-medium"
+                        : "text-gray-400"
+                    }
+                  >
+                    🏆 Legend (500)
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -12,11 +12,13 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   addDoc,
   updateDoc,
   doc,
   serverTimestamp,
   Timestamp,
+  increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { COLLECTIONS } from "./firestore";
@@ -275,7 +277,7 @@ export async function createMatch(lostItem, foundItem, score) {
       correctIndex: aiQuiz.correctIndex,
       hint: aiQuiz.hint,
       generatedByAI: aiQuiz.generatedByAI,
-      sentAt: serverTimestamp(),
+      sentAt: new Date().toISOString(),
       submittedAt: null,
     };
     console.log("AI quiz generated:", verificationQuiz.question);
@@ -289,7 +291,7 @@ export async function createMatch(lostItem, foundItem, score) {
       correctIndex: null,
       hint: "Think about what makes your item unique",
       generatedByAI: false,
-      sentAt: serverTimestamp(),
+      sentAt: new Date().toISOString(),
       submittedAt: null,
     };
   }
@@ -357,13 +359,25 @@ export async function verifyMatch(matchId, answer, isCorrect) {
 
 /**
  * Mark a match as recovered (item returned to owner)
+ * Also awards reputation points to the finder
  */
 export async function markAsRecovered(matchId, lostItemId, foundItemId) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
+  // Get the match to find the finder's ID
+  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+  const matchSnap = await getDoc(matchRef);
+
+  if (!matchSnap.exists()) {
+    throw new Error("Match not found");
+  }
+
+  const matchData = matchSnap.data();
+  const finderId = matchData.finderId;
+
   // Update match status
-  await updateDoc(doc(db, COLLECTIONS.MATCHES, matchId), {
+  await updateDoc(matchRef, {
     status: "recovered",
     recoveredAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -380,6 +394,39 @@ export async function markAsRecovered(matchId, lostItemId, foundItemId) {
     status: "claimed",
     updatedAt: serverTimestamp(),
   });
+
+  // Award reputation points to the finder (50 points for successful recovery)
+  if (finderId) {
+    try {
+      const finderRef = doc(db, COLLECTIONS.USERS, finderId);
+      await updateDoc(finderRef, {
+        reputationPoints: increment(50),
+        itemsReturned: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+      console.log(`Awarded 50 reputation points to finder: ${finderId}`);
+    } catch (error) {
+      console.error("Failed to update finder reputation:", error);
+      // Don't throw - the recovery was still successful
+    }
+  }
+
+  // Also award a smaller amount to the owner for using the platform
+  if (matchData.ownerId) {
+    try {
+      const ownerRef = doc(db, COLLECTIONS.USERS, matchData.ownerId);
+      await updateDoc(ownerRef, {
+        reputationPoints: increment(10),
+        itemsRecovered: increment(1),
+        updatedAt: serverTimestamp(),
+      });
+      console.log(
+        `Awarded 10 reputation points to owner: ${matchData.ownerId}`
+      );
+    } catch (error) {
+      console.error("Failed to update owner reputation:", error);
+    }
+  }
 }
 
 /**

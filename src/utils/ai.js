@@ -69,7 +69,7 @@ export async function generateVerificationQuestion(itemData) {
   }
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `You are a verification expert for a lost and found platform called VeriFind. Your critical job is to generate a SINGLE multiple-choice question that ONLY the TRUE OWNER of this item would be able to answer correctly.
 
@@ -293,7 +293,7 @@ function generateFallbackQuestion(category) {
   return {
     question: fallback.question,
     options: fallback.options,
-    correctIndex: Math.floor(Math.random() * 4), // Random for fallback
+    correctIndex: 0, // Always first option for fallback
     hint: fallback.hint,
     generatedByAI: false,
   };
@@ -347,7 +347,7 @@ export async function generateMatchExplanation(lostItem, foundItem, score) {
   }
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
 
     const prompt = `As a lost and found assistant, briefly explain (2-3 sentences) why these items might be a match:
 
