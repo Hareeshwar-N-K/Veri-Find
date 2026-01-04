@@ -253,14 +253,22 @@ export async function createMatch(lostItem, foundItem, score) {
     throw new Error("You must be the owner or finder to create a match");
   }
 
-  // Generate AI verification quiz using the found item's description
+  // Generate AI verification quiz using comprehensive item data
   console.log("Generating AI verification question...");
   let verificationQuiz;
   try {
-    const aiQuiz = await generateVerificationQuestion(
-      foundItem.description,
-      foundItem.category || lostItem.category
-    );
+    // Pass complete item data for better question generation
+    const aiQuiz = await generateVerificationQuestion({
+      title: foundItem.title || lostItem.title,
+      description: foundItem.description,
+      category: foundItem.category || lostItem.category,
+      locationFound: foundItem.locationFound,
+      locationLost: lostItem.locationLost,
+      dateFound: foundItem.dateFound,
+      dateLost: lostItem.dateLost,
+      currentStorageLocation: foundItem.currentStorageLocation,
+      images: foundItem.images || [],
+    });
     verificationQuiz = {
       question: aiQuiz.question,
       options: aiQuiz.options,

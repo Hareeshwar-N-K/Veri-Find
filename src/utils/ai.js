@@ -27,14 +27,41 @@ function getGenAI() {
 
 /**
  * Generate a verification question to prove item ownership
- * Uses the found item description to create a question only the true owner would know
+ * Uses comprehensive item data to create a question only the true owner would know
  *
- * @param {string} description - The found item's description
- * @param {string} category - The item category (electronics, wallet, keys, etc.)
+ * @param {object} itemData - Complete item data object
+ * @param {string} itemData.description - The item's description
+ * @param {string} itemData.category - The item category
+ * @param {string} itemData.title - The item title
+ * @param {object} itemData.location - Location where item was found/lost
+ * @param {string} itemData.dateFound - Date when item was found
+ * @param {string} itemData.storageLocation - Where item is currently stored
  * @returns {Promise<{question: string, options: string[], correctIndex: number, hint: string}>}
  */
-export async function generateVerificationQuestion(description, category) {
+export async function generateVerificationQuestion(itemData) {
   const ai = getGenAI();
+
+  // Extract data with defaults
+  const {
+    description = "",
+    category = "other",
+    title = "",
+    locationFound = {},
+    locationLost = {},
+    dateFound = null,
+    dateLost = null,
+    currentStorageLocation = "",
+    images = [],
+  } = itemData;
+
+  const location =
+    locationFound?.name || locationLost?.name || "Unknown location";
+  const date = dateFound || dateLost;
+  const dateStr = date
+    ? date.toDate
+      ? date.toDate().toLocaleDateString()
+      : new Date(date).toLocaleDateString()
+    : "Unknown date";
 
   // Fallback if no API key
   if (!ai) {
@@ -44,31 +71,99 @@ export async function generateVerificationQuestion(description, category) {
   try {
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    const prompt = `You are a verification expert for a lost and found platform. Your job is to generate a multiple-choice question that helps verify the true owner of a found item.
+    const prompt = `You are a verification expert for a lost and found platform called VeriFind. Your critical job is to generate a SINGLE multiple-choice question that ONLY the TRUE OWNER of this item would be able to answer correctly.
 
-FOUND ITEM DETAILS:
-- Category: ${category}
-- Description: ${description}
+═══════════════════════════════════════════════════════════════
+COMPLETE ITEM INFORMATION:
+═══════════════════════════════════════════════════════════════
+• Title: ${title}
+• Category: ${category}
+• Description: ${description}
+• Location Found: ${location}
+• Date: ${dateStr}
+• Storage Location: ${currentStorageLocation || "Not specified"}
+• Has Images: ${images.length > 0 ? "Yes" : "No"}
 
-RULES:
-1. Generate ONE question that only the true owner would likely know
-2. The question should be about a specific detail NOT mentioned in the description
-3. DO NOT reveal the answer in the question
-4. Create 4 believable options where only one is correct
-5. The question should be about: color variants, brand specifics, hidden features, personalization, purchase details, or unique marks
+═══════════════════════════════════════════════════════════════
+QUESTION GENERATION RULES:
+═══════════════════════════════════════════════════════════════
 
-RESPOND ONLY WITH VALID JSON in this exact format:
+1. ANALYZE the item thoroughly based on its category and description
+2. Generate a question about a SPECIFIC DETAIL that:
+   - Is NOT mentioned in the description above
+   - Only the real owner would know
+   - Cannot be guessed easily
+
+3. QUESTION TYPES by Category:
+   
+   📱 ELECTRONICS (phones, laptops, tablets):
+   - Lock screen wallpaper or home screen arrangement
+   - Last app used or notification settings
+   - Case color/brand if not mentioned
+   - Storage capacity or specific model variant
+   - Stickers, scratches, or personalization
+   
+   👛 WALLET/PURSE:
+   - Specific card in a particular slot
+   - Hidden compartment contents
+   - Photo in ID window
+   - Approximate cash amount range
+   - Loyalty cards or receipts inside
+   
+   🔑 KEYS:
+   - Number of keys on the ring
+   - Keychain description if not mentioned
+   - Key colors or special markings
+   - What each key is for
+   
+   💍 JEWELRY:
+   - Inscription or engraving inside
+   - Exact stone type or metal purity
+   - Where it was purchased
+   - Matching set items
+   
+   👕 CLOTHING/BAGS:
+   - Size or brand if not mentioned
+   - Contents of pockets
+   - Wear marks or repairs
+   - Tags or labels inside
+   
+   📄 DOCUMENTS:
+   - Specific page numbers or content
+   - Handwritten notes
+   - Stamps or signatures
+   - Paper condition details
+   
+   🎒 OTHER ITEMS:
+   - Serial numbers or model numbers
+   - Hidden compartments
+   - Personal modifications
+   - Purchase location or date
+
+4. CREATE 4 OPTIONS that are:
+   - All plausible and realistic for this item type
+   - Similar in length and style
+   - Not obviously wrong
+   - Mixed so correct answer isn't always first
+
+5. IMPORTANT CONSTRAINTS:
+   - Question MUST be directly related to the specific item described
+   - Do NOT ask generic questions
+   - Do NOT reveal the answer in the question
+   - The correct answer should be randomly placed (not always index 0)
+
+═══════════════════════════════════════════════════════════════
+OUTPUT FORMAT (STRICT JSON ONLY):
+═══════════════════════════════════════════════════════════════
+
 {
-  "question": "What is the [specific detail about the item]?",
+  "question": "Your specific question about THIS item?",
   "options": ["Option A", "Option B", "Option C", "Option D"],
-  "correctIndex": 0,
-  "hint": "Think about when you first got this item"
+  "correctIndex": [0-3 randomly],
+  "hint": "A helpful hint related to the item's personal history"
 }
 
-IMPORTANT: 
-- correctIndex should be a number 0-3
-- Make options realistic and similar in style
-- Question should not be answerable from the description alone`;
+RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
