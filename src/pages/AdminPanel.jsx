@@ -1,20 +1,35 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FiUsers, 
-  FiPackage, 
-  FiCheckCircle, 
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  FiUsers,
+  FiPackage,
+  FiCheckCircle,
   FiAlertCircle,
   FiSearch,
   FiFilter,
-  FiDownload,
-  FiBarChart2
-} from 'react-icons/fi';
-import AdminSidebar from '../components/AdminSidebar';
-import StatsCard from '../components/StatsCard';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import LoadingSpinner from '../components/LoadingSpinner';
-import { Bar, Pie } from 'react-chartjs-2';
+  FiBarChart2,
+  FiEye,
+  FiTrash2,
+  FiRefreshCw,
+} from "react-icons/fi";
+import { useAuth } from "../contexts/AuthContext";
+import AdminSidebar from "../components/AdminSidebar";
+import StatsCard from "../components/StatsCard";
+import {
+  collection,
+  getDocs,
+  query,
+  orderBy,
+  limit,
+  doc,
+  getDoc,
+  deleteDoc,
+} from "firebase/firestore";
+import { db } from "../firebase/config";
+import { COLLECTIONS } from "../services/firestore";
+import LoadingSpinner from "../components/LoadingSpinner";
+import toast from "react-hot-toast";
+import { Bar, Pie } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,7 +39,7 @@ import {
   Tooltip,
   Legend,
   ArcElement,
-} from 'chart.js';
+} from "chart.js";
 
 ChartJS.register(
   CategoryScale,
@@ -37,91 +52,171 @@ ChartJS.register(
 );
 
 const AdminPanel = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("lost"); // 'lost', 'found', 'matches'
+
   const [stats, setStats] = useState({
-    totalItems: 0,
     lostItems: 0,
     foundItems: 0,
-    matchedItems: 0,
-    returnedItems: 0,
+    totalMatches: 0,
+    recoveredItems: 0,
     totalUsers: 0,
-    activeUsers: 0,
-    pendingMatches: 0,
+    pendingVerifications: 0,
   });
-  const [loading, setLoading] = useState(true);
-  const [recentItems, setRecentItems] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  const [lostItems, setLostItems] = useState([]);
+  const [foundItems, setFoundItems] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [categoryStats, setCategoryStats] = useState({});
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    checkAdminStatus();
+  }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+
+    try {
+      const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, user.uid));
+      if (userDoc.exists() && userDoc.data().role === "admin") {
+        setIsAdmin(true);
+        fetchDashboardData();
+      } else {
+        toast.error("Access denied. Admin privileges required.");
+        navigate("/dashboard");
+      }
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      navigate("/dashboard");
+    }
+  };
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch items
-      const itemsSnapshot = await getDocs(collection(db, 'items'));
-      const itemsData = itemsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }));
+      setLoading(true);
 
-      // Fetch users
-      const usersSnapshot = await getDocs(collection(db, 'users'));
+      // Fetch lost items
+      const lostSnapshot = await getDocs(
+        query(
+          collection(db, COLLECTIONS.LOST_ITEMS),
+          orderBy("createdAt", "desc"),
+          limit(50)
+        )
+      );
+      const lostData = lostSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setLostItems(lostData);
+
+      // Fetch found items
+      const foundSnapshot = await getDocs(
+        query(
+          collection(db, COLLECTIONS.FOUND_ITEMS),
+          orderBy("createdAt", "desc"),
+          limit(50)
+        )
+      );
+      const foundData = foundSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setFoundItems(foundData);
+
+      // Fetch matches
+      const matchSnapshot = await getDocs(
+        query(
+          collection(db, COLLECTIONS.MATCHES),
+          orderBy("createdAt", "desc"),
+          limit(50)
+        )
+      );
+      const matchData = matchSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setMatches(matchData);
+
+      // Fetch users count
+      const usersSnapshot = await getDocs(collection(db, COLLECTIONS.USERS));
+
+      // Calculate category stats
+      const catStats = {};
+      [...lostData, ...foundData].forEach((item) => {
+        const cat = item.category || "other";
+        catStats[cat] = (catStats[cat] || 0) + 1;
+      });
+      setCategoryStats(catStats);
 
       // Calculate stats
-      const lostItems = itemsData.filter(item => item.status === 'lost').length;
-      const foundItems = itemsData.filter(item => item.status === 'found').length;
-      const matchedItems = itemsData.filter(item => item.status === 'matched').length;
-      const returnedItems = itemsData.filter(item => item.status === 'returned').length;
-      const pendingMatches = itemsData.filter(item => 
-        (item.status === 'lost' || item.status === 'found') && item.matches?.length > 0
-      ).length;
-
       setStats({
-        totalItems: itemsData.length,
-        lostItems,
-        foundItems,
-        matchedItems,
-        returnedItems,
+        lostItems: lostData.length,
+        foundItems: foundData.length,
+        totalMatches: matchData.length,
+        recoveredItems: matchData.filter((m) => m.status === "recovered")
+          .length,
         totalUsers: usersSnapshot.size,
-        activeUsers: usersSnapshot.size,
-        pendingMatches,
+        pendingVerifications: matchData.filter(
+          (m) => m.status === "pending_verification" || m.status === "pending"
+        ).length,
       });
-
-      // Set recent items
-      setRecentItems(itemsData
-        .sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate())
-        .slice(0, 5)
-      );
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error("Error fetching dashboard data:", error);
+      toast.error("Failed to load admin data");
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredItems = recentItems.filter(item =>
-    item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.userEmail.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const handleDelete = async (collectionName, itemId) => {
+    if (!window.confirm("Are you sure you want to delete this item?")) return;
 
+    try {
+      await deleteDoc(doc(db, collectionName, itemId));
+      toast.success("Item deleted successfully");
+      fetchDashboardData();
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      toast.error("Failed to delete item");
+    }
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return "Unknown";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  // Chart data
   const barChartData = {
-    labels: ['Lost', 'Found', 'Matched', 'Returned'],
+    labels: ["Lost", "Found", "Matched", "Recovered"],
     datasets: [
       {
-        label: 'Items Count',
-        data: [stats.lostItems, stats.foundItems, stats.matchedItems, stats.returnedItems],
+        label: "Items Count",
+        data: [
+          stats.lostItems,
+          stats.foundItems,
+          stats.totalMatches,
+          stats.recoveredItems,
+        ],
         backgroundColor: [
-          'rgba(239, 68, 68, 0.8)',
-          'rgba(34, 197, 94, 0.8)',
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(156, 163, 175, 0.8)',
+          "rgba(239, 68, 68, 0.8)",
+          "rgba(34, 197, 94, 0.8)",
+          "rgba(59, 130, 246, 0.8)",
+          "rgba(156, 163, 175, 0.8)",
         ],
         borderColor: [
-          'rgb(239, 68, 68)',
-          'rgb(34, 197, 94)',
-          'rgb(59, 130, 246)',
-          'rgb(156, 163, 175)',
+          "rgb(239, 68, 68)",
+          "rgb(34, 197, 94)",
+          "rgb(59, 130, 246)",
+          "rgb(156, 163, 175)",
         ],
         borderWidth: 1,
       },
@@ -129,23 +224,17 @@ const AdminPanel = () => {
   };
 
   const pieChartData = {
-    labels: ['Electronics', 'Books', 'Stationery', 'Clothing', 'Others'],
+    labels: Object.keys(categoryStats),
     datasets: [
       {
-        data: [25, 20, 15, 20, 20], // Mock data - replace with actual
+        data: Object.values(categoryStats),
         backgroundColor: [
-          'rgba(59, 130, 246, 0.8)',
-          'rgba(16, 185, 129, 0.8)',
-          'rgba(245, 158, 11, 0.8)',
-          'rgba(139, 92, 246, 0.8)',
-          'rgba(156, 163, 175, 0.8)',
-        ],
-        borderColor: [
-          'rgb(59, 130, 246)',
-          'rgb(16, 185, 129)',
-          'rgb(245, 158, 11)',
-          'rgb(139, 92, 246)',
-          'rgb(156, 163, 175)',
+          "rgba(59, 130, 246, 0.8)",
+          "rgba(16, 185, 129, 0.8)",
+          "rgba(245, 158, 11, 0.8)",
+          "rgba(139, 92, 246, 0.8)",
+          "rgba(236, 72, 153, 0.8)",
+          "rgba(156, 163, 175, 0.8)",
         ],
         borderWidth: 1,
       },
@@ -154,14 +243,32 @@ const AdminPanel = () => {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
-        position: 'top',
+        position: "bottom",
       },
     },
   };
 
-  if (loading) {
+  // Filter items based on search
+  const getFilteredItems = () => {
+    let items = [];
+    if (activeTab === "lost") items = lostItems;
+    else if (activeTab === "found") items = foundItems;
+    else items = matches;
+
+    if (!searchTerm) return items;
+
+    return items.filter((item) => {
+      const title = (item.title || item.itemTitle || "").toLowerCase();
+      const category = (item.category || item.itemCategory || "").toLowerCase();
+      const search = searchTerm.toLowerCase();
+      return title.includes(search) || category.includes(search);
+    });
+  };
+
+  if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <LoadingSpinner size="lg" />
@@ -169,40 +276,63 @@ const AdminPanel = () => {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="flex min-h-screen">
+        <AdminSidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner size="lg" />
+        </div>
+      </div>
+    );
+  }
+
+  const filteredItems = getFilteredItems();
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <AdminSidebar />
-      
+
       <div className="flex-1 p-8 overflow-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-600">Overview and management of the Lost & Found system</p>
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-600">VeriFind system management</p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            className="flex items-center gap-2 px-4 py-2 bg-white border rounded-lg hover:bg-gray-50"
+          >
+            <FiRefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatsCard 
-            icon={FiPackage}
-            title="Total Items"
-            value={stats.totalItems}
-            color="primary"
-          />
-          
-          <StatsCard 
+          <StatsCard
             icon={FiAlertCircle}
             title="Lost Items"
             value={stats.lostItems}
             color="red"
           />
-          
-          <StatsCard 
-            icon={FiCheckCircle}
+          <StatsCard
+            icon={FiPackage}
             title="Found Items"
             value={stats.foundItems}
             color="green"
           />
-          
-          <StatsCard 
+          <StatsCard
+            icon={FiCheckCircle}
+            title="Matches"
+            value={stats.totalMatches}
+            subtitle={`${stats.pendingVerifications} pending`}
+            color="blue"
+          />
+          <StatsCard
             icon={FiUsers}
             title="Total Users"
             value={stats.totalUsers}
@@ -212,9 +342,9 @@ const AdminPanel = () => {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="card">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Items Status Distribution</h2>
+              <h2 className="text-xl font-semibold">Items Status</h2>
               <FiBarChart2 className="w-6 h-6 text-gray-400" />
             </div>
             <div className="h-64">
@@ -222,23 +352,61 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          <div className="card">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-xl font-semibold">Items by Category</h2>
               <FiBarChart2 className="w-6 h-6 text-gray-400" />
             </div>
             <div className="h-64">
-              <Pie data={pieChartData} options={chartOptions} />
+              {Object.keys(categoryStats).length > 0 ? (
+                <Pie data={pieChartData} options={chartOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-gray-500">
+                  No data available
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Recent Items */}
-        <div className="card">
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold">Recent Items</h2>
-            
-            <div className="flex flex-col sm:flex-row gap-3 mt-4 md:mt-0">
+        {/* Items Table */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+          {/* Tabs and Search */}
+          <div className="px-6 py-4 border-b border-gray-200">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setActiveTab("lost")}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    activeTab === "lost"
+                      ? "bg-red-100 text-red-600"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Lost Items ({lostItems.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("found")}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    activeTab === "found"
+                      ? "bg-green-100 text-green-600"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Found Items ({foundItems.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab("matches")}
+                  className={`px-4 py-2 rounded-lg font-medium ${
+                    activeTab === "matches"
+                      ? "bg-blue-100 text-blue-600"
+                      : "text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  Matches ({matches.length})
+                </button>
+              </div>
+
               <div className="relative">
                 <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                 <input
@@ -246,28 +414,19 @@ const AdminPanel = () => {
                   placeholder="Search items..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none w-full md:w-64"
                 />
               </div>
-              
-              <button className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <FiFilter className="w-4 h-4 mr-2" />
-                Filter
-              </button>
-              
-              <button className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
-                <FiDownload className="w-4 h-4 mr-2" />
-                Export
-              </button>
             </div>
           </div>
 
+          {/* Table */}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead>
+              <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Item
+                    {activeTab === "matches" ? "Match Details" : "Item"}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Category
@@ -276,7 +435,7 @@ const AdminPanel = () => {
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Reported By
+                    {activeTab === "matches" ? "Score" : "Location"}
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
@@ -287,118 +446,166 @@ const AdminPanel = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filteredItems.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {item.imageUrl && (
-                          <img 
-                            src={item.imageUrl} 
-                            alt={item.name}
-                            className="w-10 h-10 rounded-lg object-cover mr-3"
-                          />
-                        )}
+                {filteredItems.length > 0 ? (
+                  filteredItems.map((item) => (
+                    <tr key={item.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
                         <div>
-                          <div className="font-medium text-gray-900">{item.name}</div>
-                          <div className="text-sm text-gray-500">{item.location}</div>
+                          <div className="font-medium text-gray-900">
+                            {item.title ||
+                              item.itemTitle ||
+                              "Match #" + item.id.slice(0, 6)}
+                          </div>
+                          <div className="text-sm text-gray-500 truncate max-w-xs">
+                            {item.description ||
+                              `Owner: ${item.ownerName || "Unknown"}`}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        item.status === 'lost' ? 'bg-red-100 text-red-800' :
-                        item.status === 'found' ? 'bg-green-100 text-green-800' :
-                        item.status === 'matched' ? 'bg-blue-100 text-blue-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.userEmail}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.createdAt?.toDate().toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button className="text-primary-600 hover:text-primary-900 mr-3">
-                        View
-                      </button>
-                      <button className="text-red-600 hover:text-red-900">
-                        Delete
-                      </button>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800 capitalize">
+                          {item.category || item.itemCategory || "N/A"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-2 py-1 text-xs rounded-full ${
+                            item.status === "searching"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : item.status === "pending"
+                              ? "bg-blue-100 text-blue-800"
+                              : item.status === "matched" ||
+                                item.status === "pending_verification"
+                              ? "bg-purple-100 text-purple-800"
+                              : item.status === "recovered" ||
+                                item.status === "claimed"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {item.status?.replace("_", " ")}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {activeTab === "matches"
+                          ? `${Math.round((item.aiScore || 0) * 100)}%`
+                          : item.locationLost?.name ||
+                            item.locationFound?.name ||
+                            "Unknown"}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {formatDate(item.createdAt)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex items-center gap-2">
+                          <Link
+                            to={
+                              activeTab === "matches"
+                                ? `/match/${item.id}`
+                                : `/item/${item.id}`
+                            }
+                            className="p-2 text-primary-600 hover:bg-primary-50 rounded"
+                          >
+                            <FiEye className="w-4 h-4" />
+                          </Link>
+                          <button
+                            onClick={() =>
+                              handleDelete(
+                                activeTab === "lost"
+                                  ? COLLECTIONS.LOST_ITEMS
+                                  : activeTab === "found"
+                                  ? COLLECTIONS.FOUND_ITEMS
+                                  : COLLECTIONS.MATCHES,
+                                item.id
+                              )
+                            }
+                            className="p-2 text-red-600 hover:bg-red-50 rounded"
+                          >
+                            <FiTrash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="6"
+                      className="px-6 py-12 text-center text-gray-500"
+                    >
+                      No {activeTab} items found
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
-
-          {filteredItems.length === 0 && (
-            <div className="text-center py-8">
-              <p className="text-gray-600">No items found</p>
-            </div>
-          )}
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-          <div className="card">
-            <h3 className="font-semibold mb-4">System Health</h3>
+        {/* Quick Info Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <h3 className="font-semibold mb-4">System Status</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Database</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Healthy</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-600">Storage</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">45% Used</span>
+                <span className="text-gray-600">Firebase</span>
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                  Connected
+                </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Matching Engine</span>
-                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">Active</span>
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                  Client-Side
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-gray-600">Cloud Functions</span>
+                <span className="px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
+                  Free Tier
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="card">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
             <h3 className="font-semibold mb-4">Pending Actions</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Items to Verify</span>
-                <span className="font-medium">{stats.pendingMatches}</span>
+                <span className="text-gray-600">Verifications</span>
+                <span className="font-medium text-orange-600">
+                  {stats.pendingVerifications}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">User Reports</span>
-                <span className="font-medium">3</span>
+                <span className="text-gray-600">Active Searches</span>
+                <span className="font-medium">
+                  {lostItems.filter((i) => i.status === "searching").length}
+                </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">System Updates</span>
-                <span className="font-medium">1</span>
+                <span className="text-gray-600">Pending Claims</span>
+                <span className="font-medium">
+                  {foundItems.filter((i) => i.status === "pending").length}
+                </span>
               </div>
             </div>
           </div>
 
-          <div className="card">
-            <h3 className="font-semibold mb-4">Quick Links</h3>
-            <div className="space-y-2">
-              <button className="w-full text-left p-2 hover:bg-gray-50 rounded">
-                View All Users
-              </button>
-              <button className="w-full text-left p-2 hover:bg-gray-50 rounded">
-                Manage Items
-              </button>
-              <button className="w-full text-left p-2 hover:bg-gray-50 rounded">
-                System Settings
-              </button>
-              <button className="w-full text-left p-2 hover:bg-gray-50 rounded">
-                Generate Reports
-              </button>
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+            <h3 className="font-semibold mb-4">Success Rate</h3>
+            <div className="text-center">
+              <div className="text-4xl font-bold text-green-600">
+                {stats.totalMatches > 0
+                  ? Math.round(
+                      (stats.recoveredItems / stats.totalMatches) * 100
+                    )
+                  : 0}
+                %
+              </div>
+              <p className="text-sm text-gray-600 mt-2">
+                {stats.recoveredItems} of {stats.totalMatches} matches recovered
+              </p>
             </div>
           </div>
         </div>

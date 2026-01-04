@@ -153,26 +153,29 @@ service cloud.firestore {
             || resource.data.finderId == request.auth.uid 
             || isModerator());
       
-      // Only Cloud Functions (admin SDK) should create matches
-      // Frontend cannot create matches directly
-      allow create: if false; // Enforced via Cloud Functions
+      // Allow authenticated users to create matches (client-side matching for free tier)
+      // Validate that the creator is either the owner or finder
+      allow create: if isAuthenticated()
+        && isNotSuspended()
+        && hasRequiredFields(['ownerId', 'finderId', 'lostItemId', 'foundItemId', 'status', 'createdAt'])
+        && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid)
+        && request.resource.data.status in ['pending_verification', 'pending'];
       
       // Owner can update to submit quiz answer
       allow update: if isOwner(resource.data.ownerId)
         && isNotSuspended()
-        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'updatedAt'])
-        && resource.data.status == 'quiz_sent'; // Can only answer when quiz is sent
+        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'status', 'updatedAt']);
       
       // Finder can update limited fields
       allow update: if isOwner(resource.data.finderId)
         && isNotSuspended()
-        && onlyUpdating(['adminNotes', 'updatedAt']);
+        && onlyUpdating(['finderNotes', 'status', 'updatedAt']);
       
       // Admins/Moderators can update status
       allow update: if isModerator();
       
-      // Only admins can delete
-      allow delete: if isAdmin();
+      // Participants or admins can delete
+      allow delete: if (isOwner(resource.data.ownerId) || isOwner(resource.data.finderId) || isAdmin());
     }
     
     // ============================================
@@ -182,8 +185,14 @@ service cloud.firestore {
       // ✅ Anyone authenticated can read (public success stories)
       allow read: if isAuthenticated();
       
-      // Only Cloud Functions can create/update/delete
-      allow create, update, delete: if false;
+      // Allow participants to create recovery entries (client-side for free tier)
+      allow create: if isAuthenticated()
+        && isNotSuspended()
+        && hasRequiredFields(['matchId', 'ownerId', 'finderId', 'recoveredAt', 'itemCategory'])
+        && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid);
+      
+      // No one can update or delete recovery entries
+      allow update, delete: if false;
     }
     
     // ============================================
@@ -208,8 +217,11 @@ service cloud.firestore {
       allow read: if isAuthenticated()
         && request.auth.uid in resource.data.participants;
       
-      // Only Cloud Functions create channels (after match approval)
-      allow create: if false;
+      // Participants can create channels after match is verified
+      allow create: if isAuthenticated()
+        && isNotSuspended()
+        && hasRequiredFields(['participants', 'matchId', 'isActive', 'createdAt'])
+        && request.auth.uid in request.resource.data.participants;
       
       // Participants can update lastMessageAt
       allow update: if isAuthenticated()

@@ -10,5 +10,5 @@ export * from "./firestore";
 // Image upload/storage operations
 export * from "./storage";
 
-// Cloud Functions calls
-export * from "./functions";
+// Client-side matching service (replaces Cloud Functions)
+export * from "./matching";

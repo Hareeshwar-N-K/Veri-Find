@@ -1,0 +1,392 @@
+/**
+ * VeriFind - Client-Side Matching Service
+ *
+ * AI-like matching algorithm that runs on the frontend
+ * to match lost items with found items based on multiple criteria.
+ *
+ * This replaces Cloud Functions for Firebase free tier.
+ */
+
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  updateDoc,
+  doc,
+  serverTimestamp,
+  Timestamp,
+} from "firebase/firestore";
+import { db, auth } from "../firebase/config";
+import { COLLECTIONS } from "./firestore";
+
+/**
+ * Calculate similarity score between two strings using Jaccard similarity
+ */
+function calculateTextSimilarity(text1, text2) {
+  if (!text1 || !text2) return 0;
+
+  const words1 = new Set(
+    text1
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+  );
+  const words2 = new Set(
+    text2
+      .toLowerCase()
+      .split(/\s+/)
+      .filter((w) => w.length > 2)
+  );
+
+  if (words1.size === 0 || words2.size === 0) return 0;
+
+  const intersection = new Set([...words1].filter((x) => words2.has(x)));
+  const union = new Set([...words1, ...words2]);
+
+  return intersection.size / union.size;
+}
+
+/**
+ * Calculate location similarity
+ */
+function calculateLocationScore(loc1, loc2) {
+  if (!loc1?.name || !loc2?.name) return 0;
+
+  // Exact match
+  if (loc1.name.toLowerCase() === loc2.name.toLowerCase()) return 1;
+
+  // Partial match
+  if (
+    loc1.name.toLowerCase().includes(loc2.name.toLowerCase()) ||
+    loc2.name.toLowerCase().includes(loc1.name.toLowerCase())
+  ) {
+    return 0.7;
+  }
+
+  // Word overlap
+  return calculateTextSimilarity(loc1.name, loc2.name);
+}
+
+/**
+ * Calculate date proximity score
+ * Items found within 7 days of being lost score higher
+ */
+function calculateDateScore(dateLost, dateFound) {
+  if (!dateLost || !dateFound) return 0.5; // Neutral if no date
+
+  const lostDate = dateLost.toDate ? dateLost.toDate() : new Date(dateLost);
+  const foundDate = dateFound.toDate ? dateFound.toDate() : new Date(dateFound);
+
+  const daysDiff = Math.abs((foundDate - lostDate) / (1000 * 60 * 60 * 24));
+
+  // Found after lost (good)
+  if (foundDate >= lostDate) {
+    if (daysDiff <= 1) return 1;
+    if (daysDiff <= 3) return 0.9;
+    if (daysDiff <= 7) return 0.7;
+    if (daysDiff <= 14) return 0.5;
+    if (daysDiff <= 30) return 0.3;
+    return 0.1;
+  }
+
+  // Found before lost (unlikely but possible)
+  return 0.2;
+}
+
+/**
+ * Calculate category match score
+ */
+function calculateCategoryScore(cat1, cat2) {
+  if (!cat1 || !cat2) return 0;
+  return cat1.toLowerCase() === cat2.toLowerCase() ? 1 : 0;
+}
+
+/**
+ * Calculate overall match score between a lost item and found item
+ * Returns a score between 0 and 1
+ */
+export function calculateMatchScore(lostItem, foundItem) {
+  const weights = {
+    category: 0.3, // Must match category
+    title: 0.2, // Title similarity
+    description: 0.2, // Description similarity
+    location: 0.2, // Location proximity
+    date: 0.1, // Date proximity
+  };
+
+  const scores = {
+    category: calculateCategoryScore(lostItem.category, foundItem.category),
+    title: calculateTextSimilarity(lostItem.title, foundItem.title),
+    description: calculateTextSimilarity(
+      lostItem.description,
+      foundItem.description
+    ),
+    location: calculateLocationScore(
+      lostItem.locationLost,
+      foundItem.locationFound
+    ),
+    date: calculateDateScore(lostItem.dateLost, foundItem.dateFound),
+  };
+
+  // If category doesn't match, score is 0
+  if (scores.category === 0) return { score: 0, breakdown: scores };
+
+  const totalScore = Object.keys(weights).reduce((sum, key) => {
+    return sum + scores[key] * weights[key];
+  }, 0);
+
+  return {
+    score: Math.round(totalScore * 100) / 100,
+    breakdown: scores,
+  };
+}
+
+/**
+ * Find potential matches for a lost item
+ */
+export async function findMatchesForLostItem(lostItem, minScore = 0.4) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  // Get all pending found items in the same category
+  const q = query(
+    collection(db, COLLECTIONS.FOUND_ITEMS),
+    where("category", "==", lostItem.category),
+    where("status", "==", "pending")
+  );
+
+  const snapshot = await getDocs(q);
+  const matches = [];
+
+  snapshot.docs.forEach((doc) => {
+    const foundItem = { id: doc.id, ...doc.data() };
+
+    // Don't match with own found items
+    if (foundItem.finderId === currentUser.uid) return;
+
+    const matchResult = calculateMatchScore(lostItem, foundItem);
+
+    if (matchResult.score >= minScore) {
+      matches.push({
+        foundItem,
+        score: matchResult.score,
+        breakdown: matchResult.breakdown,
+      });
+    }
+  });
+
+  // Sort by score descending
+  return matches.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Find potential matches for a found item
+ */
+export async function findMatchesForFoundItem(foundItem, minScore = 0.4) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  // Get all searching lost items in the same category
+  const q = query(
+    collection(db, COLLECTIONS.LOST_ITEMS),
+    where("category", "==", foundItem.category),
+    where("status", "==", "searching")
+  );
+
+  const snapshot = await getDocs(q);
+  const matches = [];
+
+  snapshot.docs.forEach((doc) => {
+    const lostItem = { id: doc.id, ...doc.data() };
+
+    // Don't match with own lost items
+    if (lostItem.ownerId === currentUser.uid) return;
+
+    const matchResult = calculateMatchScore(lostItem, foundItem);
+
+    if (matchResult.score >= minScore) {
+      matches.push({
+        lostItem,
+        score: matchResult.score,
+        breakdown: matchResult.breakdown,
+      });
+    }
+  });
+
+  // Sort by score descending
+  return matches.sort((a, b) => b.score - a.score);
+}
+
+/**
+ * Create a match record between a lost item and found item
+ */
+export async function createMatch(lostItem, foundItem, score) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  // Verify the current user is involved
+  if (
+    currentUser.uid !== lostItem.ownerId &&
+    currentUser.uid !== foundItem.finderId
+  ) {
+    throw new Error("You must be the owner or finder to create a match");
+  }
+
+  const matchData = {
+    lostItemId: lostItem.id,
+    foundItemId: foundItem.id,
+    ownerId: lostItem.ownerId,
+    ownerName: lostItem.ownerName,
+    finderId: foundItem.finderId,
+    finderName: foundItem.finderName || "Anonymous",
+    aiScore: score,
+    status: "pending_verification",
+    verificationQuiz: {
+      question:
+        lostItem.ownershipHints?.question ||
+        "Please describe a unique feature of your item",
+      sentAt: null,
+      submittedAt: null,
+    },
+    ownerAnswer: null,
+    itemCategory: lostItem.category,
+    itemTitle: lostItem.title,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(collection(db, COLLECTIONS.MATCHES), matchData);
+
+  // Update both items status to "matched"
+  await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItem.id), {
+    status: "matched",
+    updatedAt: serverTimestamp(),
+  });
+
+  await updateDoc(doc(db, COLLECTIONS.FOUND_ITEMS, foundItem.id), {
+    status: "matched",
+    updatedAt: serverTimestamp(),
+  });
+
+  return { id: docRef.id, ...matchData };
+}
+
+/**
+ * Verify match with owner's answer
+ */
+export async function verifyMatch(matchId, answer, isCorrect) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+
+  if (isCorrect) {
+    await updateDoc(matchRef, {
+      ownerAnswer: answer,
+      status: "verified",
+      "verificationQuiz.submittedAt": serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await updateDoc(matchRef, {
+      ownerAnswer: answer,
+      status: "verification_failed",
+      "verificationQuiz.submittedAt": serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  }
+}
+
+/**
+ * Mark a match as recovered (item returned to owner)
+ */
+export async function markAsRecovered(matchId, lostItemId, foundItemId) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  // Update match status
+  await updateDoc(doc(db, COLLECTIONS.MATCHES, matchId), {
+    status: "recovered",
+    recoveredAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  // Update lost item status
+  await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItemId), {
+    status: "recovered",
+    updatedAt: serverTimestamp(),
+  });
+
+  // Update found item status
+  await updateDoc(doc(db, COLLECTIONS.FOUND_ITEMS, foundItemId), {
+    status: "claimed",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Create a recovery ledger entry (public success story)
+ */
+export async function createRecoveryEntry(match, lostItem, foundItem) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const recoveryEntry = {
+    matchId: match.id,
+    ownerId: match.ownerId,
+    finderId: match.finderId,
+    itemCategory: lostItem.category,
+    itemTitle: lostItem.title,
+    itemValue: lostItem.estimatedValue || 0,
+    locationLost: lostItem.locationLost?.name || "Unknown",
+    locationFound: foundItem.locationFound?.name || "Unknown",
+    daysToRecover: Math.ceil(
+      (new Date() - (lostItem.dateLost?.toDate?.() || new Date())) /
+        (1000 * 60 * 60 * 24)
+    ),
+    recoveredAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(
+    collection(db, COLLECTIONS.RECOVERY_LEDGER),
+    recoveryEntry
+  );
+  return { id: docRef.id, ...recoveryEntry };
+}
+
+/**
+ * Create a chat channel for verified match
+ */
+export async function createChatChannel(match) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const channelData = {
+    matchId: match.id,
+    participants: [match.ownerId, match.finderId],
+    isActive: true,
+    lastMessage: null,
+    lastMessageAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(
+    collection(db, COLLECTIONS.CHAT_CHANNELS),
+    channelData
+  );
+  return { id: docRef.id, ...channelData };
+}
+
+export default {
+  calculateMatchScore,
+  findMatchesForLostItem,
+  findMatchesForFoundItem,
+  createMatch,
+  verifyMatch,
+  markAsRecovered,
+  createRecoveryEntry,
+  createChatChannel,
+};

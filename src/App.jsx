@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import ReportLost from "./pages/ReportLost";
 import ReportFound from "./pages/ReportFound";
 import ItemStatus from "./pages/ItemStatus";
+import Browse from "./pages/Browse";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 
@@ -50,6 +51,7 @@ const App = () => {
               <Route path="/" element={<Home />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
+              <Route path="/browse" element={<Browse />} />
 
               {/* User Routes */}
               <Route path="/dashboard" element={<Dashboard />} />
