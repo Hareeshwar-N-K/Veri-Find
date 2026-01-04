@@ -13,6 +13,7 @@ import Profile from "./pages/Profile";
 import ReportLost from "./pages/ReportLost";
 import ReportFound from "./pages/ReportFound";
 import ItemStatus from "./pages/ItemStatus";
+import MatchDetails from "./pages/MatchDetails";
 import Browse from "./pages/Browse";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,7 @@ const App = () => {
               <Route path="/report-lost" element={<ReportLost />} />
               <Route path="/report-found" element={<ReportFound />} />
               <Route path="/item/:id" element={<ItemStatus />} />
+              <Route path="/match/:id" element={<MatchDetails />} />
 
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminPanel />} />

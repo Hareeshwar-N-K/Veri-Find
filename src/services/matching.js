@@ -226,11 +226,29 @@ export async function createMatch(lostItem, foundItem, score) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
+  // Validate required fields exist
+  if (!lostItem?.id || !lostItem?.ownerId) {
+    console.error("Invalid lostItem:", lostItem);
+    throw new Error("Lost item must have id and ownerId");
+  }
+  if (!foundItem?.id || !foundItem?.finderId) {
+    console.error("Invalid foundItem:", foundItem);
+    throw new Error("Found item must have id and finderId");
+  }
+
   // Verify the current user is involved
-  if (
-    currentUser.uid !== lostItem.ownerId &&
-    currentUser.uid !== foundItem.finderId
-  ) {
+  const isOwner = currentUser.uid === lostItem.ownerId;
+  const isFinder = currentUser.uid === foundItem.finderId;
+
+  console.log("Creating match:", {
+    currentUserId: currentUser.uid,
+    lostItemOwnerId: lostItem.ownerId,
+    foundItemFinderId: foundItem.finderId,
+    isOwner,
+    isFinder,
+  });
+
+  if (!isOwner && !isFinder) {
     throw new Error("You must be the owner or finder to create a match");
   }
 
@@ -238,7 +256,7 @@ export async function createMatch(lostItem, foundItem, score) {
     lostItemId: lostItem.id,
     foundItemId: foundItem.id,
     ownerId: lostItem.ownerId,
-    ownerName: lostItem.ownerName,
+    ownerName: lostItem.ownerName || "Anonymous",
     finderId: foundItem.finderId,
     finderName: foundItem.finderName || "Anonymous",
     aiScore: score,
@@ -256,6 +274,8 @@ export async function createMatch(lostItem, foundItem, score) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
+
+  console.log("Match data to create:", matchData);
 
   const docRef = await addDoc(collection(db, COLLECTIONS.MATCHES), matchData);
 

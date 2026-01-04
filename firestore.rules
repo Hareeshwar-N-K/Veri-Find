@@ -156,16 +156,17 @@ service cloud.firestore {
       
       // Allow authenticated users to create matches (client-side matching for free tier)
       // Validate that the creator is either the owner or finder
+      // Note: createdAt uses serverTimestamp() so we don't require it in hasRequiredFields
       allow create: if isAuthenticated()
         && isNotSuspended()
-        && hasRequiredFields(['ownerId', 'finderId', 'lostItemId', 'foundItemId', 'status', 'createdAt'])
+        && hasRequiredFields(['ownerId', 'finderId', 'lostItemId', 'foundItemId', 'status'])
         && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid)
         && request.resource.data.status in ['pending_verification', 'pending'];
       
-      // Owner can update to submit quiz answer
+      // Owner can update to submit quiz answer and mark as recovered
       allow update: if isOwner(resource.data.ownerId)
         && isNotSuspended()
-        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'status', 'updatedAt']);
+        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'status', 'recoveredAt', 'updatedAt']);
       
       // Finder can update limited fields
       allow update: if isOwner(resource.data.finderId)
