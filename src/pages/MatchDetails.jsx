@@ -22,6 +22,7 @@ import {
   createRecoveryEntry,
   createChatChannel,
 } from "../services/matching";
+import { verifyQuizAnswer } from "../utils/ai";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 
@@ -37,8 +38,9 @@ const MatchDetails = () => {
   const [verifying, setVerifying] = useState(false);
   const [recovering, setRecovering] = useState(false);
 
-  // Verification form state
+  // Verification form state - now supports both text and multiple choice
   const [verificationAnswer, setVerificationAnswer] = useState("");
+  const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
 
   useEffect(() => {
     if (!user) {
@@ -87,32 +89,56 @@ const MatchDetails = () => {
   const isOwner = user?.uid === match?.ownerId;
   const isFinder = user?.uid === match?.finderId;
 
+  // Check if quiz is multiple choice (AI-generated)
+  const isMultipleChoice =
+    match?.verificationQuiz?.options &&
+    Array.isArray(match.verificationQuiz.options);
+
   const handleVerifySubmit = async (e) => {
     e.preventDefault();
 
-    if (!verificationAnswer.trim()) {
-      toast.error("Please enter your answer");
-      return;
+    // Validate answer based on quiz type
+    if (isMultipleChoice) {
+      if (selectedOptionIndex === null) {
+        toast.error("Please select an answer");
+        return;
+      }
+    } else {
+      if (!verificationAnswer.trim()) {
+        toast.error("Please enter your answer");
+        return;
+      }
     }
 
     try {
       setVerifying(true);
 
-      // Get the expected answer from the lost item
-      const expectedAnswer = lostItem?.ownershipHints?.expectedAnswer
-        ?.toLowerCase()
-        .trim();
-      const userAnswer = verificationAnswer.toLowerCase().trim();
+      let isCorrect;
+      let answerToSubmit;
 
-      // Simple verification - check if answer contains key words or is similar
-      // In production, you might want more sophisticated matching
-      const isCorrect = expectedAnswer
-        ? userAnswer.includes(expectedAnswer) ||
-          expectedAnswer.includes(userAnswer) ||
-          calculateSimilarity(userAnswer, expectedAnswer) > 0.6
-        : true; // If no expected answer set, auto-verify
+      if (isMultipleChoice) {
+        // AI-generated multiple choice quiz
+        isCorrect = verifyQuizAnswer(
+          match.verificationQuiz,
+          selectedOptionIndex
+        );
+        answerToSubmit = match.verificationQuiz.options[selectedOptionIndex];
+      } else {
+        // Legacy text-based verification
+        const expectedAnswer = lostItem?.ownershipHints?.expectedAnswer
+          ?.toLowerCase()
+          .trim();
+        const userAnswer = verificationAnswer.toLowerCase().trim();
 
-      await verifyMatch(id, verificationAnswer, isCorrect);
+        isCorrect = expectedAnswer
+          ? userAnswer.includes(expectedAnswer) ||
+            expectedAnswer.includes(userAnswer) ||
+            calculateSimilarity(userAnswer, expectedAnswer) > 0.6
+          : true;
+        answerToSubmit = verificationAnswer;
+      }
+
+      await verifyMatch(id, answerToSubmit, isCorrect);
 
       if (isCorrect) {
         toast.success(
@@ -394,6 +420,11 @@ const MatchDetails = () => {
               <p className="text-gray-600">
                 Answer the verification question to prove this is your item
               </p>
+              {match.verificationQuiz?.generatedByAI && (
+                <span className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full mt-1">
+                  ✨ AI-Generated Question
+                </span>
+              )}
             </div>
           </div>
 
@@ -408,19 +439,58 @@ const MatchDetails = () => {
                   "Please describe a unique identifying feature of your item"}
               </p>
 
-              <textarea
-                value={verificationAnswer}
-                onChange={(e) => setVerificationAnswer(e.target.value)}
-                placeholder="Enter your answer..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                required
-              />
+              {/* Hint if available */}
+              {match.verificationQuiz?.hint && (
+                <p className="text-sm text-blue-600 italic mb-4">
+                  💡 Hint: {match.verificationQuiz.hint}
+                </p>
+              )}
+
+              {/* Multiple Choice Options (AI-generated) */}
+              {isMultipleChoice ? (
+                <div className="space-y-3">
+                  {match.verificationQuiz.options.map((option, index) => (
+                    <label
+                      key={index}
+                      className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedOptionIndex === index
+                          ? "border-blue-500 bg-blue-50"
+                          : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="verification"
+                        value={index}
+                        checked={selectedOptionIndex === index}
+                        onChange={() => setSelectedOptionIndex(index)}
+                        className="w-5 h-5 text-blue-600"
+                      />
+                      <span className="font-medium text-gray-800">
+                        {String.fromCharCode(65 + index)}.
+                      </span>
+                      <span className="text-gray-700">{option}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : (
+                /* Text Input (Legacy/Fallback) */
+                <textarea
+                  value={verificationAnswer}
+                  onChange={(e) => setVerificationAnswer(e.target.value)}
+                  placeholder="Enter your answer..."
+                  rows={3}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  required
+                />
+              )}
             </div>
 
             <button
               type="submit"
-              disabled={verifying}
+              disabled={
+                verifying || (isMultipleChoice && selectedOptionIndex === null)
+              }
               className="w-full btn-primary py-3 disabled:opacity-50"
             >
               {verifying ? "Verifying..." : "Submit Verification"}

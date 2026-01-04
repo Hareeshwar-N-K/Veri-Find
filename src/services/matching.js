@@ -20,6 +20,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { COLLECTIONS } from "./firestore";
+import { generateVerificationQuestion } from "../utils/ai";
 
 /**
  * Calculate similarity score between two strings using Jaccard similarity
@@ -252,6 +253,39 @@ export async function createMatch(lostItem, foundItem, score) {
     throw new Error("You must be the owner or finder to create a match");
   }
 
+  // Generate AI verification quiz using the found item's description
+  console.log("Generating AI verification question...");
+  let verificationQuiz;
+  try {
+    const aiQuiz = await generateVerificationQuestion(
+      foundItem.description,
+      foundItem.category || lostItem.category
+    );
+    verificationQuiz = {
+      question: aiQuiz.question,
+      options: aiQuiz.options,
+      correctIndex: aiQuiz.correctIndex,
+      hint: aiQuiz.hint,
+      generatedByAI: aiQuiz.generatedByAI,
+      sentAt: serverTimestamp(),
+      submittedAt: null,
+    };
+    console.log("AI quiz generated:", verificationQuiz.question);
+  } catch (error) {
+    console.error("Failed to generate AI quiz, using fallback:", error);
+    verificationQuiz = {
+      question:
+        lostItem.ownershipHints?.question ||
+        "Please describe a unique identifying feature of your item",
+      options: null,
+      correctIndex: null,
+      hint: "Think about what makes your item unique",
+      generatedByAI: false,
+      sentAt: serverTimestamp(),
+      submittedAt: null,
+    };
+  }
+
   const matchData = {
     lostItemId: lostItem.id,
     foundItemId: foundItem.id,
@@ -261,13 +295,7 @@ export async function createMatch(lostItem, foundItem, score) {
     finderName: foundItem.finderName || "Anonymous",
     aiScore: score,
     status: "pending_verification",
-    verificationQuiz: {
-      question:
-        lostItem.ownershipHints?.question ||
-        "Please describe a unique feature of your item",
-      sentAt: null,
-      submittedAt: null,
-    },
+    verificationQuiz,
     ownerAnswer: null,
     itemCategory: lostItem.category,
     itemTitle: lostItem.title,
