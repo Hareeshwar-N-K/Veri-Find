@@ -49,7 +49,7 @@ service cloud.firestore {
     
     // Check if user is not suspended (new users without profile are allowed)
     function isNotSuspended() {
-      return isAuthenticated() && (!userExists() || getUserData().isSuspended != true);
+      return isAuthenticated() && (!userExists() || getUserData().get('isSuspended', false) != true);
     }
     
     // Validate required fields exist

@@ -469,13 +469,15 @@ const ItemStatus = () => {
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleCreateMatch(match)}
-                          disabled={creatingMatch}
-                          className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
-                        >
-                          {creatingMatch ? "Creating..." : "This is mine!"}
-                        </button>
+                        {itemType === "lost" && (
+                          <button
+                            onClick={() => handleCreateMatch(match)}
+                            disabled={creatingMatch}
+                            className="btn-primary text-sm px-4 py-2 disabled:opacity-50"
+                          >
+                            {creatingMatch ? "Creating..." : "This is mine!"}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );

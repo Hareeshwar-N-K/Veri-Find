@@ -26,19 +26,13 @@ function getGenAI() {
 }
 
 /**
- * Generate a verification question to prove item ownership
- * Uses comprehensive item data to create a question only the true owner would know
+ * Generate 3 verification MCQ questions to prove item ownership
+ * Uses comprehensive item data to create questions only the true owner would know
  *
  * @param {object} itemData - Complete item data object
- * @param {string} itemData.description - The item's description
- * @param {string} itemData.category - The item category
- * @param {string} itemData.title - The item title
- * @param {object} itemData.location - Location where item was found/lost
- * @param {string} itemData.dateFound - Date when item was found
- * @param {string} itemData.storageLocation - Where item is currently stored
- * @returns {Promise<{question: string, options: string[], correctIndex: number, hint: string}>}
+ * @returns {Promise<{questions: Array<{question: string, options: string[], correctIndex: number}>, hint: string, generatedByAI: boolean}>}
  */
-export async function generateVerificationQuestion(itemData) {
+export async function generateVerificationQuestions(itemData) {
   const ai = getGenAI();
 
   // Extract data with defaults
@@ -65,102 +59,137 @@ export async function generateVerificationQuestion(itemData) {
 
   // Fallback if no API key
   if (!ai) {
-    return generateFallbackQuestion(category);
+    return generateFallbackQuestions(category);
   }
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = ai.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
-    const prompt = `You are a verification expert for a lost and found platform called VeriFind. Your critical job is to generate a SINGLE multiple-choice question that ONLY the TRUE OWNER of this item would be able to answer correctly.
+    const prompt = `You are a verification expert for a lost and found platform called VeriFind. Your critical job is to generate EXACTLY 3 multiple-choice questions that ONLY the TRUE OWNER of this item would be able to answer correctly.
 
 ═══════════════════════════════════════════════════════════════
-COMPLETE ITEM INFORMATION:
+STEP 1: DATA ANALYSIS (Internal Processing)
+═══════════════════════════════════════════════════════════════
+Before generating questions, carefully analyze ALL the data below.
+Extract SPECIFIC, CONCRETE facts that can be turned into answerable questions.
+
+IMPORTANT RULES:
+1. ONLY ask about details that are EXPLICITLY mentioned in the description
+2. DO NOT assume or guess any details not provided
+3. If a specific detail (like color, brand, model) is mentioned, use it
+4. The correct answer MUST be directly from the description
+5. Wrong options should be plausible alternatives for that attribute
+
+═══════════════════════════════════════════════════════════════
+COMPLETE ITEM INFORMATION (FINDER'S REPORT):
 ═══════════════════════════════════════════════════════════════
 • Title: ${title}
 • Category: ${category}
-• Description: ${description}
+• Full Description: "${description}"
 • Location Found: ${location}
-• Date: ${dateStr}
-• Storage Location: ${currentStorageLocation || "Not specified"}
-• Has Images: ${images.length > 0 ? "Yes" : "No"}
+• Date Found: ${dateStr}
+• Current Storage Location: ${currentStorageLocation || "Not specified"}
+• Number of Images: ${images.length}
 
 ═══════════════════════════════════════════════════════════════
-QUESTION GENERATION RULES:
+STEP 2: EXTRACT FACTS FROM DESCRIPTION
+═══════════════════════════════════════════════════════════════
+Read the description carefully and identify:
+- Brand/Make (if mentioned)
+- Model/Type (if mentioned)
+- Color(s) (if mentioned)
+- Size/Capacity (if mentioned)
+- Distinguishing marks (if mentioned)
+- Accessories/Attachments (if mentioned)
+- Condition notes (if mentioned)
+- Any other specific details
+
+ONLY create questions about details that ARE PRESENT in the description.
+
+═══════════════════════════════════════════════════════════════
+STEP 3: QUESTION GENERATION RULES
 ═══════════════════════════════════════════════════════════════
 
-1. ANALYZE the item thoroughly based on its category and description
-2. Generate a question about a SPECIFIC DETAIL that:
-   - Is NOT mentioned in the description above
-   - Only the real owner would know
-   - Cannot be guessed easily
+Generate 3 DIFFERENT questions based on FACTS FROM THE DESCRIPTION:
 
-3. QUESTION TYPES by Category:
-   
-   📱 ELECTRONICS (phones, laptops, tablets):
-   - Lock screen wallpaper or home screen arrangement
-   - Last app used or notification settings
-   - Case color/brand if not mentioned
-   - Storage capacity or specific model variant
-   - Stickers, scratches, or personalization
-   
-   👛 WALLET/PURSE:
-   - Specific card in a particular slot
-   - Hidden compartment contents
-   - Photo in ID window
-   - Approximate cash amount range
-   - Loyalty cards or receipts inside
-   
-   🔑 KEYS:
-   - Number of keys on the ring
-   - Keychain description if not mentioned
-   - Key colors or special markings
-   - What each key is for
-   
-   💍 JEWELRY:
-   - Inscription or engraving inside
-   - Exact stone type or metal purity
-   - Where it was purchased
-   - Matching set items
-   
-   👕 CLOTHING/BAGS:
-   - Size or brand if not mentioned
-   - Contents of pockets
-   - Wear marks or repairs
-   - Tags or labels inside
-   
-   📄 DOCUMENTS:
-   - Specific page numbers or content
-   - Handwritten notes
-   - Stamps or signatures
-   - Paper condition details
-   
-   🎒 OTHER ITEMS:
-   - Serial numbers or model numbers
-   - Hidden compartments
-   - Personal modifications
-   - Purchase location or date
+🟢 QUESTION 1 (EASY) - From Most Obvious Detail:
+   - Ask about the most clearly stated detail (brand, color, type)
+   - The correct answer MUST come directly from the description
+   - Example: If description says "blue iPhone", ask about color
 
-4. CREATE 4 OPTIONS that are:
-   - All plausible and realistic for this item type
-   - Similar in length and style
-   - Not obviously wrong
-   - Mixed so correct answer isn't always first
+🟡 QUESTION 2 (MEDIUM) - From Specific Detail:
+   - Ask about a specific feature mentioned in description
+   - Could be model, size, capacity, material, etc.
+   - Example: If description says "128GB", ask about storage
 
-5. IMPORTANT CONSTRAINTS:
-   - Question MUST be directly related to the specific item described
-   - Do NOT ask generic questions
-   - Do NOT reveal the answer in the question
-   - The correct answer should be randomly placed (not always index 0)
+🔴 QUESTION 3 (HARD) - From Distinguishing Detail:
+   - Ask about any unique/personal detail mentioned
+   - Accessories, marks, stickers, damage, customizations
+   - Example: If description says "scratch on corner", ask about it
+
+CRITICAL RULES:
+1. EVERY question's correct answer MUST be explicitly stated in the description
+2. Do NOT invent or assume details not mentioned
+3. If description lacks certain details, ask about what IS mentioned
+4. Frame questions so the owner can answer from memory
+
+═══════════════════════════════════════════════════════════════
+CRITICAL: OPTION GENERATION RULES (ANTI-GUESSING):
+═══════════════════════════════════════════════════════════════
+
+1. ALL 4 OPTIONS MUST BE:
+   - Equally plausible and realistic for this specific item type
+   - Similar in length, format, and specificity
+   - Grammatically consistent (all start the same way)
+   - From the same category/type of answer
+   
+2. AVOID THESE COMMON MISTAKES:
+   ❌ One option obviously more detailed than others
+   ❌ One option obviously different in format
+   ❌ Using "None of the above" or "I don't know"
+   ❌ Making the correct answer always the longest/shortest
+   ❌ Using obviously wrong/silly options
+   
+3. GOOD EXAMPLES:
+   ✅ Colors: "Navy blue", "Black", "Dark gray", "Charcoal"
+   ✅ Sizes: "64GB", "128GB", "256GB", "512GB"
+   ✅ Brands: "Samsung", "Apple", "Google", "OnePlus"
+   ✅ Features: "Leather strap", "Metal band", "Silicone band", "Nylon strap"
+
+4. RANDOMIZE correct answer position (0-3) - don't always put correct first!
+
+═══════════════════════════════════════════════════════════════
+CATEGORY-SPECIFIC GUIDANCE FOR: ${category.toUpperCase()}
+═══════════════════════════════════════════════════════════════
+
+${getCategoryGuidance(category)}
 
 ═══════════════════════════════════════════════════════════════
 OUTPUT FORMAT (STRICT JSON ONLY):
 ═══════════════════════════════════════════════════════════════
 
 {
-  "question": "Your specific question about THIS item?",
-  "options": ["Option A", "Option B", "Option C", "Option D"],
-  "correctIndex": [0-3 randomly],
-  "hint": "A helpful hint related to the item's personal history"
+  "questions": [
+    {
+      "question": "Easy question about visible feature?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 2,
+      "difficulty": "easy"
+    },
+    {
+      "question": "Medium question about specific detail?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 0,
+      "difficulty": "medium"
+    },
+    {
+      "question": "Hard question about personal/hidden detail?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correctIndex": 3,
+      "difficulty": "hard"
+    }
+  ],
+  "hint": "General hint about the item"
 }
 
 RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.`;
@@ -181,107 +210,389 @@ RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.`;
 
     // Validate the response structure
     if (
-      !quizData.question ||
-      !Array.isArray(quizData.options) ||
-      quizData.options.length !== 4
+      !quizData.questions ||
+      !Array.isArray(quizData.questions) ||
+      quizData.questions.length !== 3
     ) {
       console.warn("Invalid AI response structure, using fallback");
-      return generateFallbackQuestion(category);
+      return generateFallbackQuestions(category);
+    }
+
+    // Validate each question
+    for (const q of quizData.questions) {
+      if (!q.question || !Array.isArray(q.options) || q.options.length !== 4) {
+        console.warn("Invalid question structure, using fallback");
+        return generateFallbackQuestions(category);
+      }
     }
 
     return {
-      question: quizData.question,
-      options: quizData.options,
-      correctIndex:
-        typeof quizData.correctIndex === "number" ? quizData.correctIndex : 0,
+      questions: quizData.questions.map((q) => ({
+        question: q.question,
+        options: q.options,
+        correctIndex: typeof q.correctIndex === "number" ? q.correctIndex : 0,
+        difficulty: q.difficulty || "medium",
+      })),
       hint: quizData.hint || "Think carefully about your item",
       generatedByAI: true,
     };
   } catch (error) {
-    console.error("Error generating AI question:", error);
-    return generateFallbackQuestion(category);
+    console.error("Error generating AI questions:", error);
+    return generateFallbackQuestions(category);
   }
 }
 
 /**
- * Generate a fallback question when AI is unavailable
+ * Get category-specific guidance for question generation
  */
-function generateFallbackQuestion(category) {
+function getCategoryGuidance(category) {
+  const guidance = {
+    electronics: `📱 ELECTRONICS:
+- Easy: Brand, color, case type/color
+- Medium: Storage capacity, model variant, screen size
+- Hard: Lock screen wallpaper, stickers, scratches, custom settings`,
+
+    wallet: `👛 WALLET/PURSE:
+- Easy: Color, brand, material (leather/fabric/synthetic)
+- Medium: Number of card slots, type of closure (zipper/snap/fold)
+- Hard: Specific card in a slot, hidden compartment contents, wear marks`,
+
+    keys: `🔑 KEYS:
+- Easy: Number of keys, keychain color/type
+- Medium: Key shapes/colors, specific keychain brand
+- Hard: What each key opens, hidden compartment, special markings`,
+
+    jewelry: `💍 JEWELRY:
+- Easy: Metal type (gold/silver/platinum), gemstone color
+- Medium: Chain length, clasp type, stone cut
+- Hard: Engraving text, hallmark location, repair history`,
+
+    clothing: `👕 CLOTHING:
+- Easy: Color, brand, type of closure
+- Medium: Size, specific pattern, material
+- Hard: Name on tag, repair/alterations, pocket contents`,
+
+    bags: `🎒 BAGS:
+- Easy: Brand, color, main material
+- Medium: Number of compartments, strap type, closure type
+- Hard: Hidden pocket contents, wear marks, zipper brand`,
+
+    documents: `📄 DOCUMENTS:
+- Easy: Document type, general color/size
+- Medium: Number of pages, binding type
+- Hard: Specific content, handwritten notes, stains/marks`,
+
+    other: `🔧 OTHER:
+- Easy: Color, approximate size, material
+- Medium: Brand, model, specific features
+- Hard: Serial number prefix, modifications, wear patterns`,
+  };
+
+  return guidance[category.toLowerCase()] || guidance.other;
+}
+
+/**
+ * Legacy wrapper for backward compatibility
+ * Now returns the first question from the 3-question set
+ */
+export async function generateVerificationQuestion(itemData) {
+  const result = await generateVerificationQuestions(itemData);
+
+  // Return in old format for backward compatibility (first question only)
+  // But also include all questions for new format
+  return {
+    question:
+      result.questions[0]?.question || "Describe a unique feature of your item",
+    options: result.questions[0]?.options || [],
+    correctIndex: result.questions[0]?.correctIndex || 0,
+    hint: result.hint,
+    generatedByAI: result.generatedByAI,
+    // NEW: Include all questions for 3-MCQ verification
+    allQuestions: result.questions,
+  };
+}
+
+/**
+ * Generate 3 fallback questions when AI is unavailable
+ */
+function generateFallbackQuestions(category) {
   const categoryQuestions = {
     electronics: {
-      question:
-        "What is the approximate storage capacity or a distinguishing mark on your device?",
-      options: [
-        "16GB - No marks",
-        "32GB - Small scratch on back",
-        "64GB - Sticker on case",
-        "128GB - Cracked corner",
+      questions: [
+        {
+          question: "What is the primary color of your device or its case?",
+          options: ["Black", "White/Silver", "Blue", "Other color"],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "What is the approximate storage capacity of your device?",
+          options: ["32GB or less", "64GB", "128GB", "256GB or more"],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "What personalization or mark is on your device?",
+          options: [
+            "Sticker on the back",
+            "Screen protector with crack",
+            "Scratches near charging port",
+            "No visible personalization",
+          ],
+          correctIndex: 0,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about when you purchased the device",
     },
     wallet: {
-      question:
-        "What item is in a specific slot or compartment of your wallet?",
-      options: [
-        "Library card in front slot",
-        "Old receipt in coin pocket",
-        "Photo in ID window",
-        "Business card behind cash",
+      questions: [
+        {
+          question: "What material is your wallet made of?",
+          options: [
+            "Genuine leather",
+            "Faux leather",
+            "Fabric/Canvas",
+            "Synthetic/Plastic",
+          ],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "How many card slots does your wallet have?",
+          options: ["1-4 slots", "5-8 slots", "9-12 slots", "More than 12"],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "What is in a specific compartment of your wallet?",
+          options: [
+            "Library or gym card",
+            "Old receipt or ticket",
+            "Emergency cash hidden",
+            "Photo of someone",
+          ],
+          correctIndex: 2,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about what you always keep in your wallet",
     },
     keys: {
-      question: "Describe a unique keychain or marking on your keys",
-      options: [
-        "Metal bottle opener keychain",
-        "Fabric lanyard attached",
-        "Rubber grip on main key",
-        "Small flashlight keychain",
+      questions: [
+        {
+          question: "How many keys are on your keyring?",
+          options: ["1-2 keys", "3-4 keys", "5-6 keys", "7 or more keys"],
+          correctIndex: 1,
+          difficulty: "easy",
+        },
+        {
+          question: "What type of keychain is attached?",
+          options: [
+            "Metal keychain",
+            "Plastic/rubber keychain",
+            "Fabric lanyard",
+            "No keychain",
+          ],
+          correctIndex: 0,
+          difficulty: "medium",
+        },
+        {
+          question: "What is the color of your most used key?",
+          options: [
+            "Silver/Chrome",
+            "Gold/Brass",
+            "Bronze/Copper",
+            "Painted/Colored",
+          ],
+          correctIndex: 0,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about what makes your keys unique",
     },
     jewelry: {
-      question: "What is a hidden detail or inscription on your jewelry?",
-      options: [
-        "Initials engraved inside",
-        "Small scratch near clasp",
-        "Faded hallmark",
-        "Missing stone setting",
+      questions: [
+        {
+          question: "What type of metal is your jewelry made of?",
+          options: [
+            "Gold",
+            "Silver",
+            "Platinum/White Gold",
+            "Costume/Fashion jewelry",
+          ],
+          correctIndex: 1,
+          difficulty: "easy",
+        },
+        {
+          question: "What type of clasp or closure does it have?",
+          options: [
+            "Lobster claw",
+            "Spring ring",
+            "Toggle clasp",
+            "No clasp/continuous",
+          ],
+          correctIndex: 0,
+          difficulty: "medium",
+        },
+        {
+          question: "Is there any engraving or inscription?",
+          options: [
+            "Initials engraved",
+            "Date engraved",
+            "Special message",
+            "No engraving",
+          ],
+          correctIndex: 3,
+          difficulty: "hard",
+        },
       ],
       hint: "Look for personalization or wear marks",
     },
     clothing: {
-      question: "What distinguishing feature is on your clothing item?",
-      options: [
-        "Size tag partially torn",
-        "Small stain inside pocket",
-        "Extra button sewn inside",
-        "Name written on label",
+      questions: [
+        {
+          question: "What is the primary color of the item?",
+          options: [
+            "Black/Dark gray",
+            "White/Cream",
+            "Blue/Navy",
+            "Other color",
+          ],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "What size is the clothing item?",
+          options: [
+            "Small (S)",
+            "Medium (M)",
+            "Large (L)",
+            "Extra Large (XL+)",
+          ],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "What distinguishing feature is on the item?",
+          options: [
+            "Tag partially torn",
+            "Small stain or mark",
+            "Name written inside",
+            "No distinguishing marks",
+          ],
+          correctIndex: 3,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about unique marks or repairs",
     },
     bags: {
-      question: "What is inside a hidden pocket or compartment of your bag?",
-      options: ["Emergency cash", "Old ticket stub", "Spare key", "Medicine"],
-      hint: "Think about what you always keep hidden",
+      questions: [
+        {
+          question: "What is the main color of the bag?",
+          options: ["Black", "Brown/Tan", "Navy/Blue", "Other color"],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "How many main compartments does the bag have?",
+          options: [
+            "1 compartment",
+            "2 compartments",
+            "3 compartments",
+            "4 or more",
+          ],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "What is inside a hidden pocket of the bag?",
+          options: [
+            "Emergency cash",
+            "Old ticket or receipt",
+            "Spare key",
+            "Nothing special",
+          ],
+          correctIndex: 3,
+          difficulty: "hard",
+        },
+      ],
+      hint: "Think about what you always keep in your bag",
     },
     documents: {
-      question: "What specific marking or detail is on your document?",
-      options: [
-        "Coffee stain on corner",
-        "Folded crease down middle",
-        "Highlighting on page 2",
-        "Paper clip mark",
+      questions: [
+        {
+          question: "What type of document is this?",
+          options: [
+            "Official ID/Certificate",
+            "Personal letter/note",
+            "Work document",
+            "Educational document",
+          ],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "What is the condition of the document?",
+          options: [
+            "Like new",
+            "Slightly worn",
+            "Folded/Creased",
+            "Damaged/Stained",
+          ],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "Is there any personal marking on the document?",
+          options: [
+            "Handwritten notes",
+            "Highlighter marks",
+            "Signature/stamp",
+            "No markings",
+          ],
+          correctIndex: 3,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about how you handled this document",
     },
     other: {
-      question: "Describe a unique identifying feature of your item",
-      options: [
-        "Visible scratch or dent",
-        "Faded color in one area",
-        "Custom modification",
-        "Missing part or piece",
+      questions: [
+        {
+          question: "What is the primary color of the item?",
+          options: [
+            "Black/Dark",
+            "White/Light",
+            "Colorful/Mixed",
+            "Metallic/Chrome",
+          ],
+          correctIndex: 0,
+          difficulty: "easy",
+        },
+        {
+          question: "What is the approximate size of the item?",
+          options: [
+            "Small (fits in pocket)",
+            "Medium (fits in hand)",
+            "Large (need a bag)",
+            "Very large",
+          ],
+          correctIndex: 1,
+          difficulty: "medium",
+        },
+        {
+          question: "What unique feature does your item have?",
+          options: [
+            "Visible scratch or dent",
+            "Custom modification",
+            "Wear marks from use",
+            "No unique features",
+          ],
+          correctIndex: 2,
+          difficulty: "hard",
+        },
       ],
       hint: "Think about what makes your item unique",
     },
@@ -291,9 +602,7 @@ function generateFallbackQuestion(category) {
     categoryQuestions[category.toLowerCase()] || categoryQuestions.other;
 
   return {
-    question: fallback.question,
-    options: fallback.options,
-    correctIndex: 0, // Always first option for fallback
+    questions: fallback.questions,
     hint: fallback.hint,
     generatedByAI: false,
   };
@@ -303,7 +612,7 @@ function generateFallbackQuestion(category) {
  * Verify if the owner's answer matches the expected answer
  * For AI-generated questions with multiple choice
  *
- * @param {object} quiz - The verification quiz object
+ * @param {object} quiz - The verification quiz object (single question)
  * @param {number|string} userAnswer - The user's selected answer (index or text)
  * @returns {boolean}
  */
@@ -330,6 +639,34 @@ export function verifyQuizAnswer(quiz, userAnswer) {
 }
 
 /**
+ * Verify answers for all 3 questions
+ * Returns the number of correct answers
+ *
+ * @param {Array} questions - Array of question objects with correctIndex
+ * @param {Array} userAnswers - Array of user's selected indices
+ * @returns {{correctCount: number, total: number, passed: boolean}}
+ */
+export function verifyAllQuizAnswers(questions, userAnswers) {
+  if (!questions || !Array.isArray(questions) || !userAnswers) {
+    return { correctCount: 0, total: 0, passed: false };
+  }
+
+  let correctCount = 0;
+  const total = questions.length;
+
+  questions.forEach((q, idx) => {
+    if (userAnswers[idx] === q.correctIndex) {
+      correctCount++;
+    }
+  });
+
+  // Must get at least 2 out of 3 correct to pass
+  const passed = correctCount >= Math.ceil(total * 0.66);
+
+  return { correctCount, total, passed };
+}
+
+/**
  * Generate a match confidence explanation using AI
  *
  * @param {object} lostItem - The lost item data
@@ -347,7 +684,7 @@ export async function generateMatchExplanation(lostItem, foundItem, score) {
   }
 
   try {
-    const model = ai.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = ai.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
 
     const prompt = `As a lost and found assistant, briefly explain (2-3 sentences) why these items might be a match:
 
@@ -370,6 +707,8 @@ Be helpful and encouraging but cautious. Don't confirm it's definitely the same 
 
 export default {
   generateVerificationQuestion,
+  generateVerificationQuestions,
   verifyQuizAnswer,
+  verifyAllQuizAnswers,
   generateMatchExplanation,
 };

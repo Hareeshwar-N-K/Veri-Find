@@ -22,7 +22,7 @@ import {
   createRecoveryEntry,
   createChatChannel,
 } from "../services/matching";
-import { verifyQuizAnswer } from "../utils/ai";
+import { verifyAllQuizAnswers } from "../utils/ai";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 
@@ -38,9 +38,9 @@ const MatchDetails = () => {
   const [verifying, setVerifying] = useState(false);
   const [recovering, setRecovering] = useState(false);
 
-  // Verification form state - now supports both text and multiple choice
-  const [verificationAnswer, setVerificationAnswer] = useState("");
-  const [selectedOptionIndex, setSelectedOptionIndex] = useState(null);
+  // 3 MCQ verification state - track selected answer for each question
+  const [selectedAnswers, setSelectedAnswers] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
 
   useEffect(() => {
     if (!user) {
@@ -89,63 +89,50 @@ const MatchDetails = () => {
   const isOwner = user?.uid === match?.ownerId;
   const isFinder = user?.uid === match?.finderId;
 
-  // Check if quiz is multiple choice (AI-generated)
-  const isMultipleChoice =
-    match?.verificationQuiz?.options &&
-    Array.isArray(match.verificationQuiz.options);
+  // Get questions array from quiz
+  const questions = match?.verificationQuiz?.questions || [];
+  const hasMultipleQuestions = questions.length > 1;
+
+  // Check if all questions are answered
+  const allQuestionsAnswered =
+    questions.length > 0 &&
+    Object.keys(selectedAnswers).length === questions.length;
+
+  const handleSelectAnswer = (questionIndex, optionIndex) => {
+    setSelectedAnswers((prev) => ({
+      ...prev,
+      [questionIndex]: optionIndex,
+    }));
+  };
 
   const handleVerifySubmit = async (e) => {
     e.preventDefault();
 
-    // Validate answer based on quiz type
-    if (isMultipleChoice) {
-      if (selectedOptionIndex === null) {
-        toast.error("Please select an answer");
-        return;
-      }
-    } else {
-      if (!verificationAnswer.trim()) {
-        toast.error("Please enter your answer");
-        return;
-      }
+    // Validate all questions are answered
+    if (!allQuestionsAnswered) {
+      toast.error(`Please answer all ${questions.length} questions`);
+      return;
     }
 
     try {
       setVerifying(true);
 
-      let isCorrect;
-      let answerToSubmit;
+      // Convert selectedAnswers object to array
+      const answersArray = questions.map((_, idx) => selectedAnswers[idx]);
 
-      if (isMultipleChoice) {
-        // AI-generated multiple choice quiz
-        isCorrect = verifyQuizAnswer(
-          match.verificationQuiz,
-          selectedOptionIndex
-        );
-        answerToSubmit = match.verificationQuiz.options[selectedOptionIndex];
-      } else {
-        // Legacy text-based verification
-        const expectedAnswer = lostItem?.ownershipHints?.expectedAnswer
-          ?.toLowerCase()
-          .trim();
-        const userAnswer = verificationAnswer.toLowerCase().trim();
+      // Verify all answers
+      const result = verifyAllQuizAnswers(questions, answersArray);
 
-        isCorrect = expectedAnswer
-          ? userAnswer.includes(expectedAnswer) ||
-            expectedAnswer.includes(userAnswer) ||
-            calculateSimilarity(userAnswer, expectedAnswer) > 0.6
-          : true;
-        answerToSubmit = verificationAnswer;
-      }
+      await verifyMatch(id, answersArray, result);
 
-      await verifyMatch(id, answerToSubmit, isCorrect);
-
-      if (isCorrect) {
+      if (result.passed) {
         toast.success(
-          "🎉 Verification successful! You can now contact the finder."
+          `🎉 Verification successful! You got ${result.correctCount}/${result.total} correct.`
         );
       } else {
-        toast.error("Verification failed. Your answer did not match.");
+        toast.error(
+          `Verification failed. You got ${result.correctCount}/${result.total} correct. Need at least 2 correct answers.`
+        );
       }
 
       // Refresh data
@@ -371,7 +358,14 @@ const MatchDetails = () => {
           {foundItem ? (
             <div className="space-y-3">
               <h3 className="font-semibold text-gray-900">{foundItem.title}</h3>
-              <p className="text-sm text-gray-600">{foundItem.description}</p>
+              {/* Hide description from owner since it's used for verification questions */}
+              {isFinder ? (
+                <p className="text-sm text-gray-600">{foundItem.description}</p>
+              ) : (
+                <p className="text-sm text-gray-400 italic">
+                  🔒 Description hidden for verification security
+                </p>
+              )}
 
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <FiMapPin className="w-4 h-4" />
@@ -418,82 +412,118 @@ const MatchDetails = () => {
                 Verify Your Ownership
               </h2>
               <p className="text-gray-600">
-                Answer the verification question to prove this is your item
+                Answer {questions.length} verification question
+                {questions.length > 1 ? "s" : ""} to prove this is your item.
+                {hasMultipleQuestions &&
+                  " You need at least 2 correct answers to pass."}
               </p>
               {match.verificationQuiz?.generatedByAI && (
                 <span className="inline-flex items-center gap-1 text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full mt-1">
-                  ✨ AI-Generated Question
+                  ✨ AI-Generated Questions
                 </span>
               )}
             </div>
           </div>
 
-          <form onSubmit={handleVerifySubmit} className="space-y-4">
-            <div className="bg-white rounded-lg p-4 border border-blue-200">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Verification Question:
-              </label>
-              <p className="text-lg font-medium text-gray-900 mb-4">
-                {match.verificationQuiz?.question ||
-                  lostItem?.ownershipHints?.question ||
-                  "Please describe a unique identifying feature of your item"}
-              </p>
+          {/* Hint if available */}
+          {match.verificationQuiz?.hint && (
+            <p className="text-sm text-blue-600 italic mb-4 bg-blue-50 p-3 rounded-lg">
+              💡 Hint: {match.verificationQuiz.hint}
+            </p>
+          )}
 
-              {/* Hint if available */}
-              {match.verificationQuiz?.hint && (
-                <p className="text-sm text-blue-600 italic mb-4">
-                  💡 Hint: {match.verificationQuiz.hint}
+          {/* Progress indicator */}
+          {hasMultipleQuestions && (
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm text-gray-600">Progress:</span>
+              <div className="flex gap-1">
+                {questions.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-8 h-2 rounded-full transition-colors ${
+                      selectedAnswers[idx] !== undefined
+                        ? "bg-blue-500"
+                        : "bg-gray-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">
+                {Object.keys(selectedAnswers).length}/{questions.length}{" "}
+                answered
+              </span>
+            </div>
+          )}
+
+          <form onSubmit={handleVerifySubmit} className="space-y-6">
+            {questions.map((q, qIdx) => (
+              <div
+                key={qIdx}
+                className="bg-white rounded-lg p-4 border border-blue-200"
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <span
+                    className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      q.difficulty === "easy"
+                        ? "bg-green-100 text-green-700"
+                        : q.difficulty === "hard"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-yellow-100 text-yellow-700"
+                    }`}
+                  >
+                    {q.difficulty === "easy"
+                      ? "🟢 Easy"
+                      : q.difficulty === "hard"
+                      ? "🔴 Hard"
+                      : "🟡 Medium"}
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    Question {qIdx + 1} of {questions.length}
+                  </span>
+                </div>
+
+                <p className="text-lg font-medium text-gray-900 mb-4">
+                  {q.question}
                 </p>
-              )}
 
-              {/* Multiple Choice Options (AI-generated) */}
-              {isMultipleChoice ? (
-                <div className="space-y-3">
-                  {match.verificationQuiz.options.map((option, index) => (
+                <div className="space-y-2">
+                  {q.options.map((option, optIdx) => (
                     <label
-                      key={index}
-                      className={`flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                        selectedOptionIndex === index
+                      key={optIdx}
+                      className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedAnswers[qIdx] === optIdx
                           ? "border-blue-500 bg-blue-50"
                           : "border-gray-200 hover:border-blue-300 hover:bg-gray-50"
                       }`}
                     >
                       <input
                         type="radio"
-                        name="verification"
-                        value={index}
-                        checked={selectedOptionIndex === index}
-                        onChange={() => setSelectedOptionIndex(index)}
-                        className="w-5 h-5 text-blue-600"
+                        name={`question-${qIdx}`}
+                        value={optIdx}
+                        checked={selectedAnswers[qIdx] === optIdx}
+                        onChange={() => handleSelectAnswer(qIdx, optIdx)}
+                        className="w-4 h-4 text-blue-600"
                       />
-                      <span className="font-medium text-gray-800">
-                        {String.fromCharCode(65 + index)}.
+                      <span className="font-medium text-gray-700 w-6">
+                        {String.fromCharCode(65 + optIdx)}.
                       </span>
                       <span className="text-gray-700">{option}</span>
                     </label>
                   ))}
                 </div>
-              ) : (
-                /* Text Input (Legacy/Fallback) */
-                <textarea
-                  value={verificationAnswer}
-                  onChange={(e) => setVerificationAnswer(e.target.value)}
-                  placeholder="Enter your answer..."
-                  rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  required
-                />
-              )}
-            </div>
+              </div>
+            ))}
 
             <button
               type="submit"
-              disabled={
-                verifying || (isMultipleChoice && selectedOptionIndex === null)
-              }
+              disabled={verifying || !allQuestionsAnswered}
               className="w-full btn-primary py-3 disabled:opacity-50"
             >
-              {verifying ? "Verifying..." : "Submit Verification"}
+              {verifying
+                ? "Verifying..."
+                : allQuestionsAnswered
+                ? "Submit All Answers"
+                : `Answer all ${questions.length} questions to continue`}
             </button>
           </form>
         </div>
@@ -509,8 +539,10 @@ const MatchDetails = () => {
                 Verification Failed
               </h2>
               <p className="text-red-600">
-                Your answer did not match the expected verification. If you
-                believe this is an error, please contact support.
+                {match.verificationQuiz?.correctCount !== undefined
+                  ? `You got ${match.verificationQuiz.correctCount}/${match.verificationQuiz.totalQuestions} correct. You needed at least 2 correct answers.`
+                  : "Your answers did not match the expected verification."}{" "}
+                If you believe this is an error, please contact support.
               </p>
             </div>
           </div>
@@ -527,6 +559,9 @@ const MatchDetails = () => {
                 Ownership Verified!
               </h2>
               <p className="text-green-600">
+                {match.verificationQuiz?.correctCount !== undefined
+                  ? `You got ${match.verificationQuiz.correctCount}/${match.verificationQuiz.totalQuestions} correct! `
+                  : ""}
                 You can now coordinate with the {isOwner ? "finder" : "owner"}{" "}
                 to retrieve the item.
               </p>

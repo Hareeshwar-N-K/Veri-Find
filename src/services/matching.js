@@ -256,7 +256,7 @@ export async function createMatch(lostItem, foundItem, score) {
   }
 
   // Generate AI verification quiz using comprehensive item data
-  console.log("Generating AI verification question...");
+  console.log("Generating AI verification questions (3 MCQs)...");
   let verificationQuiz;
   try {
     // Pass complete item data for better question generation
@@ -271,28 +271,44 @@ export async function createMatch(lostItem, foundItem, score) {
       currentStorageLocation: foundItem.currentStorageLocation,
       images: foundItem.images || [],
     });
+
+    // Use all 3 questions for verification
     verificationQuiz = {
-      question: aiQuiz.question,
-      options: aiQuiz.options,
-      correctIndex: aiQuiz.correctIndex,
+      questions: aiQuiz.allQuestions || [
+        {
+          question: aiQuiz.question,
+          options: aiQuiz.options,
+          correctIndex: aiQuiz.correctIndex,
+          difficulty: "medium",
+        },
+      ],
       hint: aiQuiz.hint,
       generatedByAI: aiQuiz.generatedByAI,
       sentAt: new Date().toISOString(),
       submittedAt: null,
+      userAnswers: null,
     };
-    console.log("AI quiz generated:", verificationQuiz.question);
+    console.log(
+      `AI quiz generated with ${verificationQuiz.questions.length} questions`
+    );
   } catch (error) {
     console.error("Failed to generate AI quiz, using fallback:", error);
     verificationQuiz = {
-      question:
-        lostItem.ownershipHints?.question ||
-        "Please describe a unique identifying feature of your item",
-      options: null,
-      correctIndex: null,
+      questions: [
+        {
+          question:
+            lostItem.ownershipHints?.question ||
+            "Please describe a unique identifying feature of your item",
+          options: ["Feature A", "Feature B", "Feature C", "Feature D"],
+          correctIndex: 0,
+          difficulty: "medium",
+        },
+      ],
       hint: "Think about what makes your item unique",
       generatedByAI: false,
       sentAt: new Date().toISOString(),
       submittedAt: null,
+      userAnswers: null,
     };
   }
 
@@ -332,26 +348,33 @@ export async function createMatch(lostItem, foundItem, score) {
 }
 
 /**
- * Verify match with owner's answer
+ * Verify match with owner's answers to 3 MCQ questions
+ * @param {string} matchId - The match ID
+ * @param {Array<number>} answers - Array of selected option indices for each question
+ * @param {object} result - Verification result {correctCount, total, passed}
  */
-export async function verifyMatch(matchId, answer, isCorrect) {
+export async function verifyMatch(matchId, answers, result) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
   const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
 
-  if (isCorrect) {
+  if (result.passed) {
     await updateDoc(matchRef, {
-      ownerAnswer: answer,
-      status: "verified",
+      "verificationQuiz.userAnswers": answers,
+      "verificationQuiz.correctCount": result.correctCount,
+      "verificationQuiz.totalQuestions": result.total,
       "verificationQuiz.submittedAt": serverTimestamp(),
+      status: "verified",
       updatedAt: serverTimestamp(),
     });
   } else {
     await updateDoc(matchRef, {
-      ownerAnswer: answer,
-      status: "verification_failed",
+      "verificationQuiz.userAnswers": answers,
+      "verificationQuiz.correctCount": result.correctCount,
+      "verificationQuiz.totalQuestions": result.total,
       "verificationQuiz.submittedAt": serverTimestamp(),
+      status: "verification_failed",
       updatedAt: serverTimestamp(),
     });
   }
