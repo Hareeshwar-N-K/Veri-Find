@@ -4,6 +4,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
+
 // Pages
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -17,6 +18,7 @@ import MatchDetails from "./pages/MatchDetails";
 import Browse from "./pages/Browse";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
+import AboutPage from "./pages/AboutPage";
 
 import "./App.css";
 
@@ -65,6 +67,10 @@ const App = () => {
               {/* Admin Routes */}
               <Route path="/admin" element={<AdminPanel />} />
 
+              <Route path="/about" element={<AboutPage />} />
+              <Route path="/features" element={<AboutPage />} />
+              <Route path="/contact" element={<AboutPage />} />
+              <Route path="/privacy" element={<AboutPage />} />
               {/* 404 */}
               <Route path="*" element={<NotFound />} />
             </Routes>

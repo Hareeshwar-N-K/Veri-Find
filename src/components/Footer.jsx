@@ -1,140 +1,182 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import { 
+  FiTwitter, 
+  FiInstagram, 
+  FiGithub,
+  FiMail,
+  FiMapPin,
+  FiPhone
+} from "react-icons/fi";
+import { FaRocket, FaDiscord, FaLinkedin } from "react-icons/fa";
 
 function Footer() {
+  const currentYear = new Date().getFullYear();
+
+  const quickLinks = [
+    { path: "/", label: "Home" },
+    { path: "/report-lost", label: "Report Lost" },
+    { path: "/report-found", label: "Report Found" },
+    { path: "/dashboard", label: "Dashboard" },
+    { path: "/admin", label: "Admin Panel" },
+  ];
+
+  const supportLinks = [
+    { path: "/about#about", label: "About Us" },
+    { path: "/about#features", label: "Features" },
+    { path: "/about#contact", label: "Contact" },
+    { path: "/about#privacy", label: "Privacy" },
+  ];
+
+  const socialLinks = [
+    { icon: <FiTwitter className="w-5 h-5" />, href: "#", label: "Twitter" },
+    { icon: <FiInstagram className="w-5 h-5" />, href: "#", label: "Instagram" },
+    { icon: <FaDiscord className="w-5 h-5" />, href: "#", label: "Discord" },
+    { icon: <FiGithub className="w-5 h-5" />, href: "#", label: "GitHub" },
+    { icon: <FaLinkedin className="w-5 h-5" />, href: "#", label: "LinkedIn" },
+  ];
+
+  const contactInfo = [
+    { icon: <FiMail className="w-5 h-5" />, text: "support@verifind.com" },
+    { icon: <FiPhone className="w-5 h-5" />, text: "+1 (555) 123-4567" },
+    { icon: <FiMapPin className="w-5 h-5" />, text: "Campus Tech Hub, University City" },
+  ];
+
   return (
-    <footer className="bg-gray-900 text-gray-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Brand */}
-          <div className="col-span-1 md:col-span-2">
-            <div className="flex items-center space-x-2 mb-4">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
+    <footer className="relative bg-gradient-to-b from-gray-900/95 to-gray-900 text-white border-t border-cyan-500/20">
+      {/* Floating Particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {[...Array(12)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 h-0.5 bg-gradient-to-r from-cyan-400/30 to-purple-400/30 rounded-full animate-float"
+            style={{
+              left: `${5 + i * 8}%`,
+              top: `${20 + Math.sin(i) * 60}%`,
+              animationDelay: `${i * 0.2}s`,
+              animationDuration: '8s',
+            }}
+          />
+        ))}
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 relative z-10">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-12">
+          {/* Brand Column */}
+          <div className="lg:col-span-2">
+            <div className="group flex items-center space-x-3 mb-6">
+              <div className="relative">
+                <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative w-12 h-12 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                  <FaRocket className="w-7 h-7 text-white transform group-hover:rotate-12 transition-transform" />
+                </div>
               </div>
-              <span className="text-xl font-bold text-white">VeriFind</span>
+              <div className="relative">
+                <span className="text-3xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent animate-gradient">
+                  VeriFind
+                </span>
+                <span className="absolute -bottom-1 left-0 w-full h-0.5 bg-gradient-to-r from-cyan-500 to-purple-500 transform scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left"></span>
+              </div>
             </div>
-            <p className="text-sm text-gray-400 max-w-md">
-              Helping campus communities recover lost items efficiently and
-              securely. Report, search, and reclaim your belongings with ease.
+            <p className="text-gray-400 mb-8 max-w-md text-lg leading-relaxed">
+              The smartest campus lost & found platform powered by AI to reunite you with your belongings in record time.
+            </p>
+            
+            {/* Contact Info */}
+            <div className="space-y-4">
+              {contactInfo.map((info, index) => (
+                <div key={index} className="flex items-center gap-3 group">
+                  <div className="p-2 rounded-lg bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 group-hover:border-cyan-500/40 transition-colors">
+                    {info.icon}
+                  </div>
+                  <span className="text-gray-300 group-hover:text-cyan-300 transition-colors">
+                    {info.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick Links Column */}
+          <div>
+            <h3 className="text-xl font-bold mb-6">
+              Quick Links
+            </h3>
+            <ul className="space-y-3">
+              {quickLinks.map((link) => (
+                <li key={link.path}>
+                  <Link
+                    to={link.path}
+                    className="group flex items-center gap-2 text-gray-400 hover:text-cyan-300 transition-colors duration-300"
+                  >
+                    <span className="w-0 h-0.5 bg-cyan-500 rounded-full group-hover:w-3 transition-all duration-300"></span>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Support Column */}
+          <div>
+            <h3 className="text-xl font-bold mb-6">
+              Support
+            </h3>
+            <ul className="space-y-3">
+              {supportLinks.map((link) => (
+                <li key={link.path}>
+                  <Link
+                    to={link.path}
+                    className="group flex items-center gap-2 text-gray-400 hover:text-purple-300 transition-colors duration-300"
+                  >
+                    <span className="w-0 h-0.5 bg-purple-500 rounded-full group-hover:w-3 transition-all duration-300"></span>
+                    {link.label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div className="my-12 h-px bg-gradient-to-r from-transparent via-cyan-500/30 to-transparent"></div>
+
+        {/* Bottom Bar */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+            <p className="text-gray-500 text-sm">
+              © {currentYear} VeriFind. All rights reserved.
             </p>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link
-                  to="/"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/report-lost"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Report Lost Item
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/report-found"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Report Found Item
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/dashboard"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Dashboard
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h3 className="text-white font-semibold mb-4">Support</h3>
-            <ul className="space-y-2">
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Help Center
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Contact Us
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a
-                  href="#"
-                  className="text-sm text-gray-400 hover:text-white transition-colors"
-                >
-                  Terms of Service
-                </a>
-              </li>
-            </ul>
+          {/* Social Links */}
+          <div className="flex items-center gap-4">
+            {socialLinks.map((social, index) => (
+              <a
+                key={index}
+                href={social.href}
+                aria-label={social.label}
+                className="group relative p-3 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 text-cyan-300 hover:text-white hover:border-cyan-400 transition-all duration-300"
+              >
+                <div className="relative z-10">
+                  {social.icon}
+                </div>
+                <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              </a>
+            ))}
           </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm text-gray-500">
-            © 2026 VeriFind. All rights reserved.
-          </p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <a
-              href="#"
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z" />
-              </svg>
-            </a>
-            <a
-              href="#"
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-              </svg>
-            </a>
+        {/* Back to Top */}
+        <button
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className="group fixed bottom-8 right-8 md:right-12 z-50"
+        >
+          <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+          <div className="relative w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-2xl shadow-2xl hover:scale-110 transition-transform duration-300 group">
+            <span className="transform rotate-90 group-hover:-translate-y-1 transition-transform">↥</span>
           </div>
-        </div>
+        </button>
       </div>
     </footer>
   );
