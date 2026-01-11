@@ -128,6 +128,40 @@ export async function getAllUsers(limitCount = 50) {
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+/**
+ * Get user rank based on reputation points
+ * Returns rank number and total users count
+ */
+export async function getUserRank(userId) {
+  if (!userId) return { rank: null, totalUsers: 0 };
+
+  try {
+    // Get current user's reputation points
+    const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, userId));
+    if (!userDoc.exists()) return { rank: null, totalUsers: 0 };
+
+    const userPoints = userDoc.data().reputationPoints || 0;
+
+    // Count users with higher reputation points
+    const higherRankQuery = query(
+      collection(db, COLLECTIONS.USERS),
+      where("reputationPoints", ">", userPoints)
+    );
+    const higherRankSnapshot = await getDocs(higherRankQuery);
+    const rank = higherRankSnapshot.size + 1;
+
+    // Get total users count
+    const totalUsersQuery = query(collection(db, COLLECTIONS.USERS));
+    const totalUsersSnapshot = await getDocs(totalUsersQuery);
+    const totalUsers = totalUsersSnapshot.size;
+
+    return { rank, totalUsers, reputationPoints: userPoints };
+  } catch (error) {
+    console.error("Error getting user rank:", error);
+    return { rank: null, totalUsers: 0, reputationPoints: 0 };
+  }
+}
+
 // ============================================
 // 📦 FOUND ITEMS OPERATIONS
 // ============================================
@@ -475,7 +509,7 @@ export async function getSystemSettings() {
   if (settingsSnap.exists()) {
     return { id: settingsSnap.id, ...settingsSnap.data() };
   }
-  
+
   // Return default settings if not exists
   return {
     matchThreshold: 0.7,
@@ -670,6 +704,7 @@ export default {
   getUser,
   updateUserProfile,
   getAllUsers,
+  getUserRank,
   // Found Items
   createFoundItem,
   getMyFoundItems,

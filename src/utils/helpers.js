@@ -96,3 +96,38 @@ export const capitalize = (str) => {
   if (!str) return "";
   return str.charAt(0).toUpperCase() + str.slice(1);
 };
+
+// Get user rank tier based on reputation points
+export const getRankTier = (reputationPoints = 0) => {
+  if (reputationPoints >= 1000)
+    return {
+      tier: "Legend",
+      icon: "👑",
+      color: "from-yellow-400 to-orange-500",
+    };
+  if (reputationPoints >= 500)
+    return { tier: "Master", icon: "💎", color: "from-purple-400 to-pink-500" };
+  if (reputationPoints >= 250)
+    return { tier: "Expert", icon: "⭐", color: "from-blue-400 to-cyan-500" };
+  if (reputationPoints >= 100)
+    return { tier: "Pro", icon: "🔥", color: "from-green-400 to-emerald-500" };
+  if (reputationPoints >= 50)
+    return { tier: "Rising", icon: "📈", color: "from-cyan-400 to-blue-400" };
+  return { tier: "Beginner", icon: "🌱", color: "from-gray-400 to-slate-500" };
+};
+
+// Format rank display (e.g., "#5" or "Top 10%")
+export const formatRankDisplay = (rank, totalUsers) => {
+  if (!rank || !totalUsers) return "Unranked";
+
+  const percentage = Math.ceil((rank / totalUsers) * 100);
+
+  if (rank === 1) return "🏆 #1";
+  if (rank <= 3) return `🥈 #${rank}`;
+  if (rank <= 10) return `🌟 Top 10`;
+  if (percentage <= 5) return `⭐ Top 5%`;
+  if (percentage <= 10) return `💫 Top 10%`;
+  if (percentage <= 25) return `✨ Top 25%`;
+
+  return `#${rank}`;
+};

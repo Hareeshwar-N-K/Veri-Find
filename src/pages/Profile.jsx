@@ -22,6 +22,7 @@ import {
   FiTrendingUp,
   FiRefreshCw,
 } from "react-icons/fi";
+import { FaTrophy, FaMedal, FaAward } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
 import { db } from "../firebase/config";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
@@ -29,7 +30,9 @@ import {
   getMyLostItems,
   getMyFoundItems,
   getMyMatches,
+  getUserRank,
 } from "../services/firestore";
+import { formatRankDisplay, getRankTier } from "../utils/helpers";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
@@ -51,6 +54,11 @@ const Profile = () => {
   const [myLostItems, setMyLostItems] = useState([]);
   const [myFoundItems, setMyFoundItems] = useState([]);
   const [myMatches, setMyMatches] = useState([]);
+  const [userRank, setUserRank] = useState({
+    rank: null,
+    totalUsers: 0,
+    reputationPoints: 0,
+  });
   const [stats, setStats] = useState({
     lost: 0,
     found: 0,
@@ -61,18 +69,21 @@ const Profile = () => {
   useEffect(() => {
     fetchProfile();
     fetchUserItems();
-    
+    if (user?.uid) {
+      getUserRank(user.uid).then(setUserRank);
+    }
+
     const handleMouseMove = (e) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
-    
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("scroll", handleScroll);
-    
+
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("scroll", handleScroll);
@@ -114,13 +125,17 @@ const Profile = () => {
       setMyLostItems(lostItems);
       setMyFoundItems(foundItems);
       setMyMatches(matches);
-      
+
       // Calculate stats
-      const recoveredCount = matches.filter((m) => m.status === "recovered").length;
-      const pendingMatches = matches.filter(
-        (m) => m.status === "pending_verification" || m.status === "verification_in_progress"
+      const recoveredCount = matches.filter(
+        (m) => m.status === "recovered"
       ).length;
-      
+      const pendingMatches = matches.filter(
+        (m) =>
+          m.status === "pending_verification" ||
+          m.status === "verification_in_progress"
+      ).length;
+
       setStats({
         lost: lostItems.length,
         found: foundItems.length,
@@ -148,22 +163,22 @@ const Profile = () => {
       setEditing(false);
       toast.success("Profile updated successfully!", {
         style: {
-          background: '#1e293b',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: "#1e293b",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
         },
         iconTheme: {
-          primary: '#22d3ee',
-          secondary: '#fff',
+          primary: "#22d3ee",
+          secondary: "#fff",
         },
       });
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile", {
         style: {
-          background: '#1e293b',
-          color: '#fff',
-          border: '1px solid rgba(255,255,255,0.1)',
+          background: "#1e293b",
+          color: "#fff",
+          border: "1px solid rgba(255,255,255,0.1)",
         },
       });
     }
@@ -214,7 +229,9 @@ const Profile = () => {
             <div className="mb-4">
               <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-r from-cyan-500/20 to-purple-500/20 animate-pulse"></div>
             </div>
-            <p className="text-lg text-slate-400 animate-pulse">Loading your profile...</p>
+            <p className="text-lg text-slate-400 animate-pulse">
+              Loading your profile...
+            </p>
           </div>
         </div>
       </div>
@@ -224,7 +241,7 @@ const Profile = () => {
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-[#0A0F29] via-[#111827] to-[#1E1B4B] text-white">
       <AnimatedBackground mousePosition={mousePosition} scrollY={scrollY} />
-      
+
       <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
         {/* Header with animated background */}
         <div className="relative mb-12 p-8 rounded-3xl overflow-hidden">
@@ -262,8 +279,12 @@ const Profile = () => {
               <div className="relative p-8 rounded-3xl bg-white/5 backdrop-blur-sm border border-white/10 hover:border-cyan-500/30 transition-all duration-300">
                 <div className="flex justify-between items-start mb-8">
                   <div>
-                    <h2 className="text-2xl font-bold mb-2">Personal Information</h2>
-                    <p className="text-slate-400">Update your profile details</p>
+                    <h2 className="text-2xl font-bold mb-2">
+                      Personal Information
+                    </h2>
+                    <p className="text-slate-400">
+                      Update your profile details
+                    </p>
                   </div>
                   <button
                     onClick={() => setEditing(!editing)}
@@ -324,7 +345,10 @@ const Profile = () => {
                           type="text"
                           value={formData.studentId}
                           onChange={(e) =>
-                            setFormData({ ...formData, studentId: e.target.value })
+                            setFormData({
+                              ...formData,
+                              studentId: e.target.value,
+                            })
                           }
                           className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all duration-300"
                           placeholder="S12345678"
@@ -341,7 +365,9 @@ const Profile = () => {
                           className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-slate-400"
                           readOnly
                         />
-                        <p className="text-sm text-slate-500">Email cannot be changed</p>
+                        <p className="text-sm text-slate-500">
+                          Email cannot be changed
+                        </p>
                       </div>
                     </div>
 
@@ -400,9 +426,13 @@ const Profile = () => {
                     <div className="pt-6 border-t border-white/10">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-slate-300">Account Created</p>
+                          <p className="font-medium text-slate-300">
+                            Account Created
+                          </p>
                           <p className="text-sm text-slate-400">
-                            {profile?.createdAt?.toDate().toLocaleDateString() || "Unknown"}
+                            {profile?.createdAt
+                              ?.toDate()
+                              .toLocaleDateString() || "Unknown"}
                           </p>
                         </div>
                         <div className="text-right">
@@ -425,10 +455,14 @@ const Profile = () => {
                   key={index}
                   className="relative group"
                   style={{
-                    transform: `translateY(${Math.sin(scrollY * 0.003 + index) * 5}px)`,
+                    transform: `translateY(${
+                      Math.sin(scrollY * 0.003 + index) * 5
+                    }px)`,
                   }}
                 >
-                  <div className={`p-6 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} backdrop-blur-sm transition-all duration-300 group-hover:scale-105`}>
+                  <div
+                    className={`p-6 rounded-2xl bg-gradient-to-br ${stat.gradient} border ${stat.border} backdrop-blur-sm transition-all duration-300 group-hover:scale-105`}
+                  >
                     <div className="flex items-center justify-between mb-3">
                       <div className="text-2xl">{stat.icon}</div>
                       {stat.badge && (
@@ -443,7 +477,9 @@ const Profile = () => {
                     <div className="text-3xl font-bold bg-gradient-to-r from-white to-slate-200 bg-clip-text text-transparent">
                       {stat.value}
                     </div>
-                    <div className="text-sm text-slate-300 mt-1">{stat.label}</div>
+                    <div className="text-sm text-slate-300 mt-1">
+                      {stat.label}
+                    </div>
                     <div className="h-0.5 w-0 group-hover:w-full bg-gradient-to-r from-cyan-500 to-purple-500 transition-all duration-500 mt-2 rounded-full"></div>
                   </div>
                 </div>
@@ -457,7 +493,9 @@ const Profile = () => {
                 <div className="flex justify-between items-center mb-8">
                   <div>
                     <h2 className="text-2xl font-bold mb-2">My Items</h2>
-                    <p className="text-slate-400">Track your lost and found items</p>
+                    <p className="text-slate-400">
+                      Track your lost and found items
+                    </p>
                   </div>
                   <Link
                     to="/report-lost"
@@ -471,9 +509,28 @@ const Profile = () => {
                 {/* Tabs */}
                 <div className="flex gap-2 mb-8 p-1 bg-white/5 rounded-2xl">
                   {[
-                    { id: "lost", label: "Lost", icon: <FiSearch />, count: myLostItems.length, color: "red" },
-                    { id: "found", label: "Found", icon: <FiPackage />, count: myFoundItems.length, color: "green" },
-                    { id: "matches", label: "Matches", icon: <FiBell />, count: myMatches.length, color: "yellow", badge: stats.pending },
+                    {
+                      id: "lost",
+                      label: "Lost",
+                      icon: <FiSearch />,
+                      count: myLostItems.length,
+                      color: "red",
+                    },
+                    {
+                      id: "found",
+                      label: "Found",
+                      icon: <FiPackage />,
+                      count: myFoundItems.length,
+                      color: "green",
+                    },
+                    {
+                      id: "matches",
+                      label: "Matches",
+                      icon: <FiBell />,
+                      count: myMatches.length,
+                      color: "yellow",
+                      badge: stats.pending,
+                    },
                   ].map((tab) => (
                     <button
                       key={tab.id}
@@ -534,6 +591,130 @@ const Profile = () => {
 
           {/* Right Column - Settings */}
           <div className="space-y-8">
+            {/* Reputation & Ranking Card */}
+            <div className="relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-3xl blur-xl group-hover:opacity-100 opacity-50 transition-opacity duration-300"></div>
+              <div className="relative p-8 rounded-3xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 backdrop-blur-sm border border-yellow-500/30">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold flex items-center gap-2">
+                    <FaTrophy className="text-yellow-400" />
+                    Reputation & Rank
+                  </h2>
+                </div>
+
+                {/* Rank Display */}
+                <div className="mb-6 p-4 rounded-2xl bg-white/5 border border-yellow-500/20">
+                  <div className="text-center">
+                    <div className="text-5xl mb-2">
+                      {getRankTier(userRank.reputationPoints).icon}
+                    </div>
+                    <div
+                      className={`text-2xl font-bold mb-1 bg-gradient-to-r ${
+                        getRankTier(userRank.reputationPoints).color
+                      } bg-clip-text text-transparent`}
+                    >
+                      {getRankTier(userRank.reputationPoints).tier}
+                    </div>
+                    <div className="text-lg text-yellow-300 font-semibold">
+                      {formatRankDisplay(userRank.rank, userRank.totalUsers)}
+                    </div>
+                    <div className="text-sm text-slate-400 mt-1">
+                      out of {userRank.totalUsers} users
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reputation Points */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-slate-300 font-medium">
+                      Reputation Points
+                    </span>
+                    <span className="text-2xl font-bold text-yellow-400">
+                      {userRank.reputationPoints || 0}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full transition-all duration-1000"
+                      style={{
+                        width: `${Math.min(
+                          (userRank.reputationPoints / 1000) * 100,
+                          100
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-400 mt-1">
+                    <span>0</span>
+                    <span>Legend (1000)</span>
+                  </div>
+                </div>
+
+                {/* Points Breakdown */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <FaMedal className="text-green-400" />
+                      <span className="text-sm text-slate-300">
+                        Items Returned
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-green-400">
+                      +50 pts each
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
+                    <div className="flex items-center gap-2">
+                      <FaAward className="text-blue-400" />
+                      <span className="text-sm text-slate-300">
+                        Items Recovered
+                      </span>
+                    </div>
+                    <span className="text-sm font-semibold text-blue-400">
+                      +10 pts each
+                    </span>
+                  </div>
+                </div>
+
+                {/* Next Tier */}
+                {userRank.reputationPoints < 1000 && (
+                  <div className="mt-6 p-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/20">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-slate-300">Next Tier</p>
+                        <p className="font-bold text-purple-400">
+                          {userRank.reputationPoints >= 500
+                            ? "Legend 👑"
+                            : userRank.reputationPoints >= 250
+                            ? "Master 💎"
+                            : userRank.reputationPoints >= 100
+                            ? "Expert ⭐"
+                            : userRank.reputationPoints >= 50
+                            ? "Pro 🔥"
+                            : "Rising 📈"}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-2xl font-bold text-purple-400">
+                          {userRank.reputationPoints >= 500
+                            ? 1000 - userRank.reputationPoints
+                            : userRank.reputationPoints >= 250
+                            ? 500 - userRank.reputationPoints
+                            : userRank.reputationPoints >= 100
+                            ? 250 - userRank.reputationPoints
+                            : userRank.reputationPoints >= 50
+                            ? 100 - userRank.reputationPoints
+                            : 50 - userRank.reputationPoints}
+                        </p>
+                        <p className="text-xs text-slate-400">points to go</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Account Settings */}
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-3xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
@@ -590,7 +771,9 @@ const Profile = () => {
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-3xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-300"></div>
               <div className="relative p-8 rounded-3xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 backdrop-blur-sm border border-blue-500/30">
-                <h2 className="text-2xl font-bold mb-6 text-blue-400">Need Help?</h2>
+                <h2 className="text-2xl font-bold mb-6 text-blue-400">
+                  Need Help?
+                </h2>
                 <div className="space-y-3">
                   <HelpButton
                     title="FAQs & Help Center"
@@ -652,7 +835,9 @@ const Profile = () => {
           to="/report-lost"
           className="relative w-16 h-16 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-2xl shadow-2xl hover:scale-110 transition-transform duration-300 group/button"
         >
-          <span className="group-hover/button:rotate-180 transition-transform duration-500">+</span>
+          <span className="group-hover/button:rotate-180 transition-transform duration-500">
+            +
+          </span>
           <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-xs animate-pulse">
             !
           </div>
@@ -665,38 +850,49 @@ const Profile = () => {
 // Helper Components
 const AnimatedBackground = ({ mousePosition, scrollY }) => (
   <div className="fixed inset-0 overflow-hidden pointer-events-none">
-    <div 
+    <div
       className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl animate-float"
       style={{
-        transform: `translateY(${Math.sin(scrollY * 0.003) * 20}px) rotate(${scrollY * 0.005}deg)`
+        transform: `translateY(${Math.sin(scrollY * 0.003) * 20}px) rotate(${
+          scrollY * 0.005
+        }deg)`,
       }}
     ></div>
-    <div 
+    <div
       className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-float-reverse"
       style={{
-        animationDelay: '1s',
-        transform: `translateY(${Math.cos(scrollY * 0.002) * 20}px) rotate(${-scrollY * 0.005}deg)`
+        animationDelay: "1s",
+        transform: `translateY(${Math.cos(scrollY * 0.002) * 20}px) rotate(${
+          -scrollY * 0.005
+        }deg)`,
       }}
     ></div>
-    
-    <div className="absolute inset-0" style={{
-      backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+
+    <div
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
                        linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)`,
-      backgroundSize: '50px 50px',
-      transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`
-    }}></div>
-    
-    <div 
+        backgroundSize: "50px 50px",
+        transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`,
+      }}
+    ></div>
+
+    <div
       className="absolute w-[800px] h-[800px] bg-gradient-to-r from-cyan-500/5 to-purple-500/5 rounded-full blur-3xl transition-all duration-300 ease-out"
       style={{
-        transform: `translate(${mousePosition.x - 400}px, ${mousePosition.y - 400}px) scale(${1 + Math.sin(Date.now() * 0.001) * 0.1})`,
+        transform: `translate(${mousePosition.x - 400}px, ${
+          mousePosition.y - 400
+        }px) scale(${1 + Math.sin(Date.now() * 0.001) * 0.1})`,
       }}
     ></div>
   </div>
 );
 
 const InfoCard = ({ icon, label, value, gradient, border }) => (
-  <div className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} border ${border} backdrop-blur-sm transition-all duration-300 hover:scale-105 group`}>
+  <div
+    className={`p-4 rounded-2xl bg-gradient-to-br ${gradient} border ${border} backdrop-blur-sm transition-all duration-300 hover:scale-105 group`}
+  >
     <div className="flex items-center gap-3">
       <div className="p-2 rounded-lg bg-white/10 group-hover:scale-110 transition-transform duration-300">
         {icon}
@@ -727,14 +923,16 @@ const SettingsButton = ({ icon, title, description }) => (
 const VerificationItem = ({ label, verified, pending, color }) => (
   <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
     <span>{label}</span>
-    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-      verified 
-        ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-        : pending
-        ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-        : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-    }`}>
-      {verified ? 'Verified' : pending ? 'Pending' : 'Not Set'}
+    <span
+      className={`px-3 py-1 rounded-full text-sm font-medium ${
+        verified
+          ? "bg-green-500/20 text-green-400 border border-green-500/30"
+          : pending
+          ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+          : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+      }`}
+    >
+      {verified ? "Verified" : pending ? "Pending" : "Not Set"}
     </span>
   </div>
 );
@@ -757,12 +955,12 @@ const HelpButton = ({ title, description }) => (
 const QuickStatItem = ({ label, value, icon, color }) => (
   <div className="flex items-center justify-between p-3 rounded-xl bg-white/5">
     <div className="flex items-center gap-3">
-      <div className={`p-2 rounded-lg bg-${color}-500/20`}>
-        {icon}
-      </div>
+      <div className={`p-2 rounded-lg bg-${color}-500/20`}>{icon}</div>
       <span className="text-slate-300">{label}</span>
     </div>
-    <span className={`text-lg font-bold bg-gradient-to-r from-${color}-400 to-${color}-600 bg-clip-text text-transparent`}>
+    <span
+      className={`text-lg font-bold bg-gradient-to-r from-${color}-400 to-${color}-600 bg-clip-text text-transparent`}
+    >
       {value}
     </span>
   </div>
@@ -773,7 +971,7 @@ const ItemsList = ({ items, emptyMessage, emptyLink, emptyLinkText, type }) => (
     {items.length === 0 ? (
       <div className="text-center py-12">
         <div className="text-4xl mb-4 opacity-50">
-          {type === 'lost' ? '🔍' : type === 'found' ? '🎯' : '✨'}
+          {type === "lost" ? "🔍" : type === "found" ? "🎯" : "✨"}
         </div>
         <p className="text-slate-400 mb-4">{emptyMessage}</p>
         <Link
@@ -796,7 +994,7 @@ const ItemsList = ({ items, emptyMessage, emptyLink, emptyLinkText, type }) => (
                 <h3 className="font-medium group-hover/item:text-cyan-300 transition-colors">
                   {item.title}
                 </h3>
-                {item.status === 'recovered' || item.status === 'claimed' ? (
+                {item.status === "recovered" || item.status === "claimed" ? (
                   <span className="px-2 py-1 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30">
                     ✓ Recovered
                   </span>
@@ -810,9 +1008,12 @@ const ItemsList = ({ items, emptyMessage, emptyLink, emptyLinkText, type }) => (
               <div className="flex items-center gap-4 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
                   <FiClock className="w-3 h-3" />
-                  {item.dateLost?.toDate?.()?.toLocaleDateString() || item.dateFound?.toDate?.()?.toLocaleDateString()}
+                  {item.dateLost?.toDate?.()?.toLocaleDateString() ||
+                    item.dateFound?.toDate?.()?.toLocaleDateString()}
                 </span>
-                <span>{item.locationLost?.name || item.locationFound?.name}</span>
+                <span>
+                  {item.locationLost?.name || item.locationFound?.name}
+                </span>
               </div>
             </div>
             <Link
@@ -834,57 +1035,71 @@ const MatchesList = ({ matches }) => (
       <div className="text-center py-12">
         <div className="text-4xl mb-4 opacity-50">✨</div>
         <p className="text-slate-400 mb-2">No matches yet</p>
-        <p className="text-sm text-slate-500">When your items are matched, they'll appear here</p>
+        <p className="text-sm text-slate-500">
+          When your items are matched, they'll appear here
+        </p>
       </div>
     ) : (
       matches.map((match) => (
         <div
           key={match.id}
           className={`p-4 rounded-xl backdrop-blur-sm border transition-all duration-300 hover:scale-[1.02] ${
-            match.status === 'pending_verification' || match.status === 'verification_in_progress'
-              ? 'bg-yellow-500/10 border-yellow-500/30'
-              : match.status === 'recovered'
-              ? 'bg-green-500/10 border-green-500/30'
-              : 'bg-white/5 border-white/10'
+            match.status === "pending_verification" ||
+            match.status === "verification_in_progress"
+              ? "bg-yellow-500/10 border-yellow-500/30"
+              : match.status === "recovered"
+              ? "bg-green-500/10 border-green-500/30"
+              : "bg-white/5 border-white/10"
           }`}
         >
           <div className="flex justify-between items-start">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                  match.role === 'owner'
-                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                    : 'bg-green-500/20 text-green-400 border border-green-500/30'
-                }`}>
-                  {match.role === 'owner' ? 'Your Lost Item' : 'You Found This'}
+                <span
+                  className={`px-2 py-1 text-xs rounded-full font-medium ${
+                    match.role === "owner"
+                      ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                      : "bg-green-500/20 text-green-400 border border-green-500/30"
+                  }`}
+                >
+                  {match.role === "owner" ? "Your Lost Item" : "You Found This"}
                 </span>
-                {(match.status === 'pending_verification' || match.status === 'verification_in_progress') && (
+                {(match.status === "pending_verification" ||
+                  match.status === "verification_in_progress") && (
                   <span className="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30 animate-pulse">
                     ⚡ Action Needed
                   </span>
                 )}
               </div>
               <p className="font-medium mb-1">
-                Match Score: <span className="text-cyan-400">{Math.round((match.aiScore || 0) * 100)}%</span>
+                Match Score:{" "}
+                <span className="text-cyan-400">
+                  {Math.round((match.aiScore || 0) * 100)}%
+                </span>
               </p>
               <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
                 <span className="flex items-center gap-1">
                   <FiClock className="w-3 h-3" />
-                  {match.createdAt?.toDate?.()?.toLocaleDateString() || 'Unknown date'}
+                  {match.createdAt?.toDate?.()?.toLocaleDateString() ||
+                    "Unknown date"}
                 </span>
               </div>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <span className={`px-2 py-1 text-xs rounded-full font-medium ${
-                match.status === 'pending_verification'
-                  ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                  : match.status === 'verification_in_progress'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : match.status === 'recovered'
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                  : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'
-              }`}>
-                {match.status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              <span
+                className={`px-2 py-1 text-xs rounded-full font-medium ${
+                  match.status === "pending_verification"
+                    ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                    : match.status === "verification_in_progress"
+                    ? "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                    : match.status === "recovered"
+                    ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                    : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                }`}
+              >
+                {match.status
+                  .replace(/_/g, " ")
+                  .replace(/\b\w/g, (l) => l.toUpperCase())}
               </span>
               <Link
                 to={`/match/${match.id}`}

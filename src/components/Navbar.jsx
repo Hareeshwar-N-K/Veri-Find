@@ -1,38 +1,54 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { 
-  FiHome, 
-  FiSearch, 
-  FiPlusCircle, 
-  FiUser, 
-  FiLogOut, 
-  FiSettings, 
+import {
+  FiHome,
+  FiSearch,
+  FiPlusCircle,
+  FiUser,
+  FiLogOut,
+  FiSettings,
   FiBell,
   FiChevronDown,
   FiMenu,
   FiX,
   FiGrid,
   FiStar,
-  FiZap
+  FiZap,
+  FiTrendingUp,
 } from "react-icons/fi";
-import { 
-  FaRocket, 
+import {
+  FaRocket,
   FaChartLine,
   FaGem,
-  FaRegCompass
+  FaRegCompass,
+  FaTrophy,
 } from "react-icons/fa";
+import { getUserRank } from "../services/firestore";
+import { formatRankDisplay, getRankTier } from "../utils/helpers";
 
 function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [userRank, setUserRank] = useState({
+    rank: null,
+    totalUsers: 0,
+    reputationPoints: 0,
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, logout } = useAuth();
   const profileRef = useRef(null);
   const notificationsRef = useRef(null);
+
+  // Fetch user rank
+  useEffect(() => {
+    if (currentUser?.uid) {
+      getUserRank(currentUser.uid).then(setUserRank);
+    }
+  }, [currentUser]);
 
   // Handle scroll effect
   useEffect(() => {
@@ -49,7 +65,10 @@ function Navbar() {
       if (profileRef.current && !profileRef.current.contains(event.target)) {
         setIsProfileOpen(false);
       }
-      if (notificationsRef.current && !notificationsRef.current.contains(event.target)) {
+      if (
+        notificationsRef.current &&
+        !notificationsRef.current.contains(event.target)
+      ) {
         setIsNotificationsOpen(false);
       }
     };
@@ -75,8 +94,18 @@ function Navbar() {
 
   // Mock notifications
   const notifications = [
-    { id: 1, text: "New match found for your lost wallet", time: "2 min ago", read: false },
-    { id: 2, text: "Your found item was verified", time: "1 hour ago", read: true },
+    {
+      id: 1,
+      text: "New match found for your lost wallet",
+      time: "2 min ago",
+      read: false,
+    },
+    {
+      id: 2,
+      text: "Your found item was verified",
+      time: "1 hour ago",
+      read: true,
+    },
     { id: 3, text: "System update completed", time: "3 hours ago", read: true },
   ];
 
@@ -84,20 +113,19 @@ function Navbar() {
     <>
       {/* Top Glow Line */}
       <div className="fixed inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-500 via-purple-500 to-cyan-500 animate-slide z-60 shadow-lg shadow-cyan-500/20"></div>
-      
+
       {/* Navbar Container */}
-      <nav className={`fixed w-full z-50 transition-all duration-500 ${
-        scrolled 
-          ? "bg-gradient-to-b from-gray-900/95 via-gray-900/90 to-gray-900/95 backdrop-blur-xl shadow-2xl border-b border-cyan-900/30" 
-          : "bg-gradient-to-b from-gray-900 via-gray-900/95 to-gray-900/90 backdrop-blur-lg"
-      }`}>
+      <nav
+        className={`fixed w-full z-50 transition-all duration-500 ${
+          scrolled
+            ? "bg-gradient-to-b from-gray-900/95 via-gray-900/90 to-gray-900/95 backdrop-blur-xl shadow-2xl border-b border-cyan-900/30"
+            : "bg-gradient-to-b from-gray-900 via-gray-900/95 to-gray-900/90 backdrop-blur-lg"
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16 md:h-20">
             {/* Logo */}
-            <Link 
-              to="/" 
-              className="group flex items-center space-x-3 relative"
-            >
+            <Link to="/" className="group flex items-center space-x-3 relative">
               <div className="relative">
                 <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/30 to-purple-500/30 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
                 <div className="relative w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-cyan-500 via-purple-500 to-pink-500 rounded-xl flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
@@ -126,19 +154,21 @@ function Navbar() {
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <link.icon className={`w-4 h-4 ${
-                      isActive(link.path) 
-                        ? 'text-cyan-300' 
-                        : 'text-gray-400 group-hover:text-cyan-300'
-                    }`} />
+                    <link.icon
+                      className={`w-4 h-4 ${
+                        isActive(link.path)
+                          ? "text-cyan-300"
+                          : "text-gray-400 group-hover:text-cyan-300"
+                      }`}
+                    />
                     {link.label}
                   </div>
-                  
+
                   {/* Active Indicator */}
                   {isActive(link.path) && (
                     <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gradient-to-r from-cyan-400 to-purple-400 rounded-full"></div>
                   )}
-                  
+
                   {/* Hover Glow */}
                   <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>
                 </Link>
@@ -164,7 +194,9 @@ function Navbar() {
                   {isNotificationsOpen && (
                     <div className="absolute right-0 mt-2 w-80 bg-gradient-to-b from-gray-900 to-gray-800 backdrop-blur-xl rounded-2xl shadow-2xl border border-cyan-500/30 py-3 z-50">
                       <div className="px-4 py-3 border-b border-white/10 bg-gradient-to-r from-cyan-500/10 to-purple-500/10">
-                        <h3 className="text-lg font-bold text-white">Notifications</h3>
+                        <h3 className="text-lg font-bold text-white">
+                          Notifications
+                        </h3>
                         <p className="text-sm text-cyan-300">Recent alerts</p>
                       </div>
                       <div className="max-h-72 overflow-y-auto">
@@ -172,11 +204,17 @@ function Navbar() {
                           <div
                             key={notif.id}
                             className={`px-4 py-3 hover:bg-white/5 transition-colors ${
-                              !notif.read ? 'border-l-2 border-cyan-500 bg-cyan-500/5' : ''
+                              !notif.read
+                                ? "border-l-2 border-cyan-500 bg-cyan-500/5"
+                                : ""
                             }`}
                           >
-                            <p className="text-sm text-gray-200">{notif.text}</p>
-                            <p className="text-xs text-cyan-400 mt-1">{notif.time}</p>
+                            <p className="text-sm text-gray-200">
+                              {notif.text}
+                            </p>
+                            <p className="text-xs text-cyan-400 mt-1">
+                              {notif.time}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -186,7 +224,8 @@ function Navbar() {
                           onClick={() => setIsNotificationsOpen(false)}
                           className="text-sm text-cyan-300 hover:text-cyan-200 transition-colors flex items-center gap-1"
                         >
-                          View all <FiChevronDown className="w-4 h-4 rotate-90" />
+                          View all{" "}
+                          <FiChevronDown className="w-4 h-4 rotate-90" />
                         </Link>
                       </div>
                     </div>
@@ -216,16 +255,23 @@ function Navbar() {
                     </div>
                     <div className="text-left">
                       <p className="text-sm font-medium text-white">
-                        {currentUser.displayName?.split(' ')[0] || "User"}
+                        {currentUser.displayName?.split(" ")[0] || "User"}
                       </p>
                       <div className="flex items-center gap-1">
-                        <FiStar className="w-3 h-3 text-yellow-400" />
-                        <p className="text-xs text-cyan-300">Premium</p>
+                        <FiTrendingUp className="w-3 h-3 text-yellow-400" />
+                        <p className="text-xs text-cyan-300">
+                          {formatRankDisplay(
+                            userRank.rank,
+                            userRank.totalUsers
+                          )}
+                        </p>
                       </div>
                     </div>
-                    <FiChevronDown className={`w-4 h-4 text-cyan-400 transition-transform duration-300 ${
-                      isProfileOpen ? "rotate-180" : ""
-                    }`} />
+                    <FiChevronDown
+                      className={`w-4 h-4 text-cyan-400 transition-transform duration-300 ${
+                        isProfileOpen ? "rotate-180" : ""
+                      }`}
+                    />
                   </button>
 
                   {/* Profile Dropdown */}
@@ -244,16 +290,30 @@ function Navbar() {
                             className="w-12 h-12 rounded-full border-2 border-cyan-500"
                           />
                           <div>
-                            <p className="font-bold text-white">{currentUser.displayName}</p>
-                            <p className="text-xs text-cyan-300 truncate">{currentUser.email}</p>
+                            <p className="font-bold text-white">
+                              {currentUser.displayName}
+                            </p>
+                            <p className="text-xs text-cyan-300 truncate">
+                              {currentUser.email}
+                            </p>
                             <div className="flex items-center gap-2 mt-1">
-                              <FaGem className="w-3 h-3 text-purple-400" />
-                              <span className="text-xs text-purple-300 font-medium">Premium Plan</span>
+                              <FaTrophy className="w-3 h-3 text-yellow-400" />
+                              <span
+                                className={`text-xs font-medium bg-gradient-to-r ${
+                                  getRankTier(userRank.reputationPoints).color
+                                } bg-clip-text text-transparent`}
+                              >
+                                {getRankTier(userRank.reputationPoints).tier} •{" "}
+                                {formatRankDisplay(
+                                  userRank.rank,
+                                  userRank.totalUsers
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="py-2 space-y-1">
                         <Link
                           to="/dashboard"
@@ -291,7 +351,7 @@ function Navbar() {
                           </Link>
                         )}
                       </div>
-                      
+
                       <div className="border-t border-white/10 pt-2 mx-2">
                         <button
                           onClick={handleLogout}
@@ -360,11 +420,13 @@ function Navbar() {
                         : "text-gray-300 hover:text-white hover:bg-white/5"
                     }`}
                   >
-                    <link.icon className={`w-5 h-5 ${
-                      isActive(link.path) 
-                        ? 'text-cyan-300' 
-                        : 'text-gray-400 group-hover:text-cyan-300'
-                    }`} />
+                    <link.icon
+                      className={`w-5 h-5 ${
+                        isActive(link.path)
+                          ? "text-cyan-300"
+                          : "text-gray-400 group-hover:text-cyan-300"
+                      }`}
+                    />
                     {link.label}
                     {isActive(link.path) && (
                       <div className="ml-auto w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
@@ -391,11 +453,25 @@ function Navbar() {
                         className="w-12 h-12 rounded-full border-2 border-cyan-500"
                       />
                       <div>
-                        <p className="font-bold text-white">{currentUser.displayName}</p>
-                        <p className="text-xs text-cyan-300">{currentUser.email}</p>
+                        <p className="font-bold text-white">
+                          {currentUser.displayName}
+                        </p>
+                        <p className="text-xs text-cyan-300">
+                          {currentUser.email}
+                        </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <FiStar className="w-3 h-3 text-yellow-400" />
-                          <span className="text-xs text-yellow-300 font-medium">Premium</span>
+                          <FaTrophy className="w-3 h-3 text-yellow-400" />
+                          <span
+                            className={`text-xs font-medium bg-gradient-to-r ${
+                              getRankTier(userRank.reputationPoints).color
+                            } bg-clip-text text-transparent`}
+                          >
+                            {getRankTier(userRank.reputationPoints).tier} •{" "}
+                            {formatRankDisplay(
+                              userRank.rank,
+                              userRank.totalUsers
+                            )}
+                          </span>
                         </div>
                       </div>
                     </div>
