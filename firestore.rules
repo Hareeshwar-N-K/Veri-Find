@@ -77,8 +77,12 @@ service cloud.firestore {
       
       // Users can update their own profile (limited fields)
       allow update: if isOwner(userId) 
-        && onlyUpdating(['displayName', 'photoURL', 'lastActiveAt', 'updatedAt'])
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'reputationScore', 'badges', 'isSuspended']);
+        && onlyUpdating(['displayName', 'photoURL', 'lastActiveAt', 'updatedAt', 'notificationsEnabled', 'emailNotificationsEnabled'])
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'reputationPoints', 'badges', 'isSuspended']);
+      
+      // Allow system to update reputation points (when matches are verified)
+      allow update: if isAuthenticated()
+        && onlyUpdating(['reputationPoints', 'updatedAt']);
       
       // Admins can update any user (including role, suspension)
       allow update: if isAdmin();
@@ -264,6 +268,33 @@ service cloud.firestore {
       
       // No one can delete system settings
       allow delete: if false;
+    }
+    
+    // ============================================
+    // 9️⃣ NOTIFICATIONS (User Notifications)
+    // ============================================
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() 
+        && resource.data.userId == request.auth.uid;
+      
+      // System can create notifications for users
+      // Users can create notifications (for internal matching system)
+      allow create: if isAuthenticated()
+        && request.resource.data.userId != null
+        && hasRequiredFields(['userId', 'type', 'message', 'isRead', 'createdAt']);
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated()
+        && resource.data.userId == request.auth.uid
+        && onlyUpdating(['isRead', 'updatedAt']);
+      
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated()
+        && resource.data.userId == request.auth.uid;
+      
+      // Admins can do everything
+      allow read, write: if isAdmin();
     }
     
     // ============================================

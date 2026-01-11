@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { FiUpload, FiMapPin, FiTag, FiCalendar, FiLock, FiDollarSign } from "react-icons/fi";
+import {
+  FiUpload,
+  FiMapPin,
+  FiTag,
+  FiCalendar,
+  FiLock,
+  FiDollarSign,
+} from "react-icons/fi";
 import { MdDescription, MdSecurity } from "react-icons/md";
 import { useAuth } from "../contexts/AuthContext";
 import { createLostItem } from "../services/firestore";
@@ -21,7 +28,7 @@ const ReportLost = () => {
   const [imagePreview, setImagePreview] = useState("");
   const [step, setStep] = useState(1);
   const [isImageHovered, setIsImageHovered] = useState(false);
-  
+
   // Home page animations state
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
@@ -43,15 +50,15 @@ const ReportLost = () => {
     const handleMouseMove = (e) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
-    
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("scroll", handleScroll);
     setIsVisible(true);
-    
+
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("scroll", handleScroll);
@@ -125,15 +132,19 @@ const ReportLost = () => {
         images,
         reportedBy: user.uid,
         reportedAt: new Date().toISOString(),
-        status: "lost"
+        status: "lost",
       };
 
       const result = await createLostItem(itemData);
 
       toast.success(
         <div className="flex flex-col">
-          <span className="font-semibold">🎉 Lost Item Reported Successfully!</span>
-          <span className="text-sm">We'll notify you as soon as we find a match.</span>
+          <span className="font-semibold">
+            🎉 Lost Item Reported Successfully!
+          </span>
+          <span className="text-sm">
+            We'll notify you as soon as we find a match.
+          </span>
         </div>,
         { duration: 5000 }
       );
@@ -143,7 +154,9 @@ const ReportLost = () => {
       toast.error(
         <div className="flex flex-col">
           <span className="font-semibold">⚠️ Failed to Report Item</span>
-          <span className="text-sm">{error.message || "Please try again."}</span>
+          <span className="text-sm">
+            {error.message || "Please try again."}
+          </span>
         </div>
       );
     } finally {
@@ -164,27 +177,34 @@ const ReportLost = () => {
     <div className="relative overflow-hidden bg-gradient-to-br from-[#0A0F29] via-[#111827] to-[#1E1B4B] text-white min-h-screen">
       {/* Animated Background Elements - Same as Home */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div 
+        <div
           className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl animate-float"
           style={{
-            transform: `translateY(${Math.sin(scrollY * 0.003) * 20}px) rotate(${scrollY * 0.005}deg)`
+            transform: `translateY(${
+              Math.sin(scrollY * 0.003) * 20
+            }px) rotate(${scrollY * 0.005}deg)`,
           }}
         ></div>
-        <div 
+        <div
           className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-float-reverse"
           style={{
-            animationDelay: '1s',
-            transform: `translateY(${Math.cos(scrollY * 0.002) * 20}px) rotate(${-scrollY * 0.005}deg)`
+            animationDelay: "1s",
+            transform: `translateY(${
+              Math.cos(scrollY * 0.002) * 20
+            }px) rotate(${-scrollY * 0.005}deg)`,
           }}
         ></div>
-        
-        <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
                            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
-          transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`
-        }}></div>
-        
+            backgroundSize: "50px 50px",
+            transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`,
+          }}
+        ></div>
+
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
@@ -193,39 +213,62 @@ const ReportLost = () => {
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`
+              animationDuration: `${3 + Math.random() * 4}s`,
             }}
           />
         ))}
-        
-        <div 
+
+        <div
           className="absolute w-[800px] h-[800px] bg-gradient-to-r from-cyan-500/5 to-purple-500/5 rounded-full blur-3xl transition-all duration-300 ease-out"
           style={{
-            transform: `translate(${mousePosition.x - 400}px, ${mousePosition.y - 400}px)`,
+            transform: `translate(${mousePosition.x - 400}px, ${
+              mousePosition.y - 400
+            }px)`,
           }}
         ></div>
-        
-        <svg className="absolute inset-0 w-full h-full" style={{opacity: 0.1}}>
+
+        <svg
+          className="absolute inset-0 w-full h-full"
+          style={{ opacity: 0.1 }}
+        >
           <defs>
             <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style={{stopColor: '#22d3ee', stopOpacity: 1}} />
-              <stop offset="100%" style={{stopColor: '#a855f7', stopOpacity: 1}} />
+              <stop
+                offset="0%"
+                style={{ stopColor: "#22d3ee", stopOpacity: 1 }}
+              />
+              <stop
+                offset="100%"
+                style={{ stopColor: "#a855f7", stopOpacity: 1 }}
+              />
             </linearGradient>
           </defs>
-          {[...Array(5)].map((_, i) => (
-            <path
-              key={i}
-              d={`M ${Math.random() * 100}% ${Math.random() * 100}% 
-                  C ${Math.random() * 100}% ${Math.random() * 100}%, 
-                    ${Math.random() * 100}% ${Math.random() * 100}%, 
-                    ${Math.random() * 100}% ${Math.random() * 100}%`}
-              stroke="url(#gradient)"
-              strokeWidth="1"
-              fill="none"
-              className="animate-draw"
-              style={{strokeDasharray: 1000, strokeDashoffset: 1000, animationDelay: `${i * 0.5}s`}}
-            />
-          ))}
+          {[...Array(5)].map((_, i) => {
+            const startX = Math.random() * 100;
+            const startY = Math.random() * 100;
+            const cp1X = Math.random() * 100;
+            const cp1Y = Math.random() * 100;
+            const cp2X = Math.random() * 100;
+            const cp2Y = Math.random() * 100;
+            const endX = Math.random() * 100;
+            const endY = Math.random() * 100;
+            return (
+              <path
+                key={i}
+                d={`M ${startX} ${startY} C ${cp1X} ${cp1Y}, ${cp2X} ${cp2Y}, ${endX} ${endY}`}
+                stroke="url(#gradient)"
+                strokeWidth="1"
+                fill="none"
+                className="animate-draw"
+                style={{
+                  strokeDasharray: 1000,
+                  strokeDashoffset: 1000,
+                  animationDelay: `${i * 0.5}s`,
+                }}
+                vectorEffect="non-scaling-stroke"
+              />
+            );
+          })}
         </svg>
       </div>
 
@@ -233,7 +276,13 @@ const ReportLost = () => {
       <div className="relative z-10 pt-24 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
-          <div className={`text-center mb-10 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div
+            className={`text-center mb-10 transition-all duration-1000 ${
+              isVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-10"
+            }`}
+          >
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 mb-6 shadow-lg animate-float">
               <FiLock className="w-10 h-10 text-white" />
             </div>
@@ -252,24 +301,35 @@ const ReportLost = () => {
             <div className="flex justify-between items-center mb-4 relative">
               {[1, 2, 3].map((s) => (
                 <div key={s} className="flex flex-col items-center z-10">
-                  <div className={`
+                  <div
+                    className={`
                     w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold
                     transition-all duration-300 transform hover:scale-110
-                    ${s <= step 
-                      ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg' 
-                      : 'bg-white/10 backdrop-blur-sm border border-white/20 text-slate-300'
+                    ${
+                      s <= step
+                        ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-lg"
+                        : "bg-white/10 backdrop-blur-sm border border-white/20 text-slate-300"
                     }
-                    ${s === step ? 'ring-4 ring-cyan-500/30 ring-opacity-50' : ''}
-                  `}>
+                    ${
+                      s === step
+                        ? "ring-4 ring-cyan-500/30 ring-opacity-50"
+                        : ""
+                    }
+                  `}
+                  >
                     {s}
                   </div>
                   <span className="mt-2 text-sm font-medium text-slate-300">
-                    {s === 1 ? 'Item Details' : s === 2 ? 'Upload Photo' : 'Verification'}
+                    {s === 1
+                      ? "Item Details"
+                      : s === 2
+                      ? "Upload Photo"
+                      : "Verification"}
                   </span>
                 </div>
               ))}
               <div className="absolute left-1/4 right-1/4 h-1 bg-white/10 backdrop-blur-sm -translate-y-6 z-0">
-                <div 
+                <div
                   className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 transition-all duration-500 rounded-full"
                   style={{ width: `${((step - 1) / 2) * 100}%` }}
                 ></div>
@@ -288,8 +348,12 @@ const ReportLost = () => {
                         <MdDescription className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">Item Details</h2>
-                        <p className="text-cyan-200/80">Tell us about what you lost</p>
+                        <h2 className="text-2xl font-bold text-white">
+                          Item Details
+                        </h2>
+                        <p className="text-cyan-200/80">
+                          Tell us about what you lost
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -330,9 +394,15 @@ const ReportLost = () => {
                             className="w-full px-4 py-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent text-white appearance-none transition-all duration-300 group-hover:shadow-lg"
                             required
                           >
-                            <option value="" className="bg-[#0A0F29]">Select Category</option>
+                            <option value="" className="bg-[#0A0F29]">
+                              Select Category
+                            </option>
                             {itemCategories.map((cat) => (
-                              <option key={cat.value} value={cat.value} className="bg-[#0A0F29]">
+                              <option
+                                key={cat.value}
+                                value={cat.value}
+                                className="bg-[#0A0F29]"
+                              >
                                 {cat.icon} {cat.label}
                               </option>
                             ))}
@@ -381,9 +451,15 @@ const ReportLost = () => {
                             className="w-full px-4 py-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-white appearance-none transition-all duration-300 group-hover:shadow-lg"
                             required
                           >
-                            <option value="" className="bg-[#0A0F29]">Select Location</option>
+                            <option value="" className="bg-[#0A0F29]">
+                              Select Location
+                            </option>
                             {locations.map((loc) => (
-                              <option key={loc.value} value={loc.value} className="bg-[#0A0F29]">
+                              <option
+                                key={loc.value}
+                                value={loc.value}
+                                className="bg-[#0A0F29]"
+                              >
                                 {loc.icon} {loc.label}
                               </option>
                             ))}
@@ -463,13 +539,31 @@ const ReportLost = () => {
                   <button
                     type="button"
                     onClick={nextStep}
-                    disabled={!formData.title || !formData.category || !formData.description || !formData.locationName || !formData.dateLost}
+                    disabled={
+                      !formData.title ||
+                      !formData.category ||
+                      !formData.description ||
+                      !formData.locationName ||
+                      !formData.dateLost
+                    }
                     className="relative px-8 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-semibold rounded-xl hover:from-cyan-600 hover:to-blue-700 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-3 shadow-lg group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-600 to-blue-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <span className="relative z-10">Continue to Photo Upload</span>
-                    <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    <span className="relative z-10">
+                      Continue to Photo Upload
+                    </span>
+                    <svg
+                      className="w-5 h-5 relative z-10"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -486,8 +580,12 @@ const ReportLost = () => {
                         <FiUpload className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">Upload Photo</h2>
-                        <p className="text-purple-200/80">Help us identify your lost item</p>
+                        <h2 className="text-2xl font-bold text-white">
+                          Upload Photo
+                        </h2>
+                        <p className="text-purple-200/80">
+                          Help us identify your lost item
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -495,7 +593,7 @@ const ReportLost = () => {
                   <div className="p-8">
                     <div className="space-y-8">
                       {/* Image Upload Area */}
-                      <div 
+                      <div
                         className="group relative"
                         onMouseEnter={() => setIsImageHovered(true)}
                         onMouseLeave={() => setIsImageHovered(false)}
@@ -508,8 +606,18 @@ const ReportLost = () => {
                                 alt="Preview"
                                 className="w-full h-full object-contain rounded-xl p-4"
                               />
-                              <div className={`absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-xl transition-opacity duration-300 ${isImageHovered ? 'opacity-100' : 'opacity-0'}`}></div>
-                              <div className={`absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full text-white font-medium transition-all duration-300 ${isImageHovered ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                              <div
+                                className={`absolute inset-0 bg-gradient-to-t from-black/40 to-transparent rounded-xl transition-opacity duration-300 ${
+                                  isImageHovered ? "opacity-100" : "opacity-0"
+                                }`}
+                              ></div>
+                              <div
+                                className={`absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white/20 backdrop-blur-sm px-6 py-3 rounded-full text-white font-medium transition-all duration-300 ${
+                                  isImageHovered
+                                    ? "opacity-100 translate-y-0"
+                                    : "opacity-0 translate-y-4"
+                                }`}
+                              >
                                 Click to change photo
                               </div>
                             </div>
@@ -522,7 +630,9 @@ const ReportLost = () => {
                                 <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full blur-xl opacity-30 animate-ping"></div>
                               </div>
                               <p className="mb-2 text-xl font-semibold text-white">
-                                <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">Click to upload</span>
+                                <span className="bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                                  Click to upload
+                                </span>
                               </p>
                               <p className="text-slate-300 mb-4">
                                 or drag and drop
@@ -566,7 +676,9 @@ const ReportLost = () => {
                             <span className="text-white font-bold">💡</span>
                           </div>
                           <div>
-                            <h4 className="font-semibold text-white mb-2">Photo Tips</h4>
+                            <h4 className="font-semibold text-white mb-2">
+                              Photo Tips
+                            </h4>
                             <ul className="space-y-2 text-slate-300">
                               <li className="flex items-center">
                                 <div className="w-2 h-2 bg-cyan-500 rounded-full mr-3"></div>
@@ -574,7 +686,8 @@ const ReportLost = () => {
                               </li>
                               <li className="flex items-center">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                                Include photos showing any unique marks or damage
+                                Include photos showing any unique marks or
+                                damage
                               </li>
                               <li className="flex items-center">
                                 <div className="w-2 h-2 bg-purple-500 rounded-full mr-3"></div>
@@ -596,8 +709,18 @@ const ReportLost = () => {
                     className="relative px-8 py-4 bg-white/10 backdrop-blur-sm text-slate-300 font-semibold rounded-xl border border-white/20 hover:border-white/30 hover:bg-white/20 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 shadow group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    <svg
+                      className="w-5 h-5 relative z-10"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
                     </svg>
                     <span className="relative z-10">Back to Details</span>
                   </button>
@@ -608,9 +731,21 @@ const ReportLost = () => {
                     className="relative px-8 py-4 bg-gradient-to-r from-purple-500 to-pink-600 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-700 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 shadow-lg group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                    <span className="relative z-10">Continue to Verification</span>
-                    <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    <span className="relative z-10">
+                      Continue to Verification
+                    </span>
+                    <svg
+                      className="w-5 h-5 relative z-10"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
                     </svg>
                   </button>
                 </div>
@@ -627,8 +762,12 @@ const ReportLost = () => {
                         <FiLock className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h2 className="text-2xl font-bold text-white">Ownership Verification</h2>
-                        <p className="text-emerald-200/80">Protect your item with a secret question</p>
+                        <h2 className="text-2xl font-bold text-white">
+                          Ownership Verification
+                        </h2>
+                        <p className="text-emerald-200/80">
+                          Protect your item with a secret question
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -648,23 +787,33 @@ const ReportLost = () => {
                               🔐 Secure Verification System
                             </h3>
                             <p className="text-slate-300 mb-4">
-                              Create a secret question that only you, the true owner, can answer. This prevents false claims and ensures your item is returned to you.
+                              Create a secret question that only you, the true
+                              owner, can answer. This prevents false claims and
+                              ensures your item is returned to you.
                             </p>
                             <div className="space-y-3">
                               <div className="flex items-start space-x-3">
                                 <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-1">
-                                  <span className="text-cyan-400 font-bold text-sm">✓</span>
+                                  <span className="text-cyan-400 font-bold text-sm">
+                                    ✓
+                                  </span>
                                 </div>
                                 <p className="text-cyan-200">
-                                  <strong>Your answer is encrypted</strong> and never shown to anyone
+                                  <strong>Your answer is encrypted</strong> and
+                                  never shown to anyone
                                 </p>
                               </div>
                               <div className="flex items-start space-x-3">
                                 <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-1">
-                                  <span className="text-cyan-400 font-bold text-sm">✓</span>
+                                  <span className="text-cyan-400 font-bold text-sm">
+                                    ✓
+                                  </span>
                                 </div>
                                 <p className="text-cyan-200">
-                                  <strong>Only matches with correct answers</strong> can contact you
+                                  <strong>
+                                    Only matches with correct answers
+                                  </strong>{" "}
+                                  can contact you
                                 </p>
                               </div>
                             </div>
@@ -686,20 +835,39 @@ const ReportLost = () => {
                             className="w-full px-4 py-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-white appearance-none transition-all duration-300 group-hover:shadow-lg"
                             required
                           >
-                            <option value="" className="bg-[#0A0F29]">Select a question type...</option>
-                            <option value="What is a unique mark, scratch, or feature on this item?" className="bg-[#0A0F29]">
-                              What is a unique mark, scratch, or feature on this item?
+                            <option value="" className="bg-[#0A0F29]">
+                              Select a question type...
                             </option>
-                            <option value="What was the last thing stored inside/on this item?" className="bg-[#0A0F29]">
-                              What was the last thing stored inside/on this item?
+                            <option
+                              value="What is a unique mark, scratch, or feature on this item?"
+                              className="bg-[#0A0F29]"
+                            >
+                              What is a unique mark, scratch, or feature on this
+                              item?
                             </option>
-                            <option value="What sticker, keychain, or accessory is attached?" className="bg-[#0A0F29]">
+                            <option
+                              value="What was the last thing stored inside/on this item?"
+                              className="bg-[#0A0F29]"
+                            >
+                              What was the last thing stored inside/on this
+                              item?
+                            </option>
+                            <option
+                              value="What sticker, keychain, or accessory is attached?"
+                              className="bg-[#0A0F29]"
+                            >
                               What sticker, keychain, or accessory is attached?
                             </option>
-                            <option value="What is the lock code, password hint, or security feature?" className="bg-[#0A0F29]">
-                              What is the lock code, password hint, or security feature?
+                            <option
+                              value="What is the lock code, password hint, or security feature?"
+                              className="bg-[#0A0F29]"
+                            >
+                              What is the lock code, password hint, or security
+                              feature?
                             </option>
-                            <option value="custom" className="bg-[#0A0F29]">Custom question...</option>
+                            <option value="custom" className="bg-[#0A0F29]">
+                              Custom question...
+                            </option>
                           </select>
                           <div className="absolute inset-0 border-2 border-transparent group-hover:border-emerald-500/50 rounded-xl pointer-events-none transition-all duration-300"></div>
                         </div>
@@ -743,42 +911,61 @@ const ReportLost = () => {
                         </div>
                         <p className="mt-3 text-sm text-slate-400 flex items-center">
                           <FiLock className="w-4 h-4 mr-2 text-amber-400" />
-                          This answer will be used to verify ownership when a match is found.
+                          This answer will be used to verify ownership when a
+                          match is found.
                         </p>
                       </div>
 
                       {/* Review Summary */}
                       <div className="bg-gradient-to-r from-white/5 to-white/10 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-                        <h4 className="font-bold text-white mb-4 text-lg">📋 Review Summary</h4>
+                        <h4 className="font-bold text-white mb-4 text-lg">
+                          📋 Review Summary
+                        </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span className="text-slate-400">Item:</span>
-                              <span className="font-semibold text-white">{formData.title || "Not specified"}</span>
+                              <span className="font-semibold text-white">
+                                {formData.title || "Not specified"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-400">Category:</span>
                               <span className="font-semibold text-white">
-                                {itemCategories.find(c => c.value === formData.category)?.label || "Not specified"}
+                                {itemCategories.find(
+                                  (c) => c.value === formData.category
+                                )?.label || "Not specified"}
                               </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-400">Last seen:</span>
-                              <span className="font-semibold text-white">{formData.locationName || "Not specified"}</span>
+                              <span className="font-semibold text-white">
+                                {formData.locationName || "Not specified"}
+                              </span>
                             </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span className="text-slate-400">Date lost:</span>
-                              <span className="font-semibold text-white">{formData.dateLost || "Not specified"}</span>
+                              <span className="font-semibold text-white">
+                                {formData.dateLost || "Not specified"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
                               <span className="text-slate-400">Photo:</span>
-                              <span className="font-semibold text-white">{imagePreview ? "Uploaded ✅" : "Not uploaded"}</span>
+                              <span className="font-semibold text-white">
+                                {imagePreview ? "Uploaded ✅" : "Not uploaded"}
+                              </span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Verification:</span>
-                              <span className="font-semibold text-white">{formData.verificationQuestion ? "Set ✅" : "Not set"}</span>
+                              <span className="text-slate-400">
+                                Verification:
+                              </span>
+                              <span className="font-semibold text-white">
+                                {formData.verificationQuestion
+                                  ? "Set ✅"
+                                  : "Not set"}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -795,8 +982,18 @@ const ReportLost = () => {
                     className="relative px-8 py-4 bg-white/10 backdrop-blur-sm text-slate-300 font-semibold rounded-xl border border-white/20 hover:border-white/30 hover:bg-white/20 transition-all duration-300 transform hover:scale-105 flex items-center space-x-3 shadow group overflow-hidden"
                   >
                     <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 to-transparent translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
-                    <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    <svg
+                      className="w-5 h-5 relative z-10"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"
+                      />
                     </svg>
                     <span className="relative z-10">Back to Photo</span>
                   </button>
@@ -809,10 +1006,14 @@ const ReportLost = () => {
                     >
                       Start Over
                     </button>
-                    
+
                     <button
                       type="submit"
-                      disabled={loading || !formData.verificationQuestion || !formData.verificationAnswer}
+                      disabled={
+                        loading ||
+                        !formData.verificationQuestion ||
+                        !formData.verificationAnswer
+                      }
                       className="relative px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-3 shadow-lg group overflow-hidden"
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 to-green-700 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -823,9 +1024,21 @@ const ReportLost = () => {
                         </span>
                       ) : (
                         <>
-                          <span className="relative z-10">Report Lost Item</span>
-                          <svg className="w-5 h-5 relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          <span className="relative z-10">
+                            Report Lost Item
+                          </span>
+                          <svg
+                            className="w-5 h-5 relative z-10"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M5 13l4 4L19 7"
+                            />
                           </svg>
                         </>
                       )}
@@ -843,8 +1056,12 @@ const ReportLost = () => {
                 <div className="w-24 h-24 rounded-full bg-gradient-to-r from-cyan-500 to-blue-600 flex items-center justify-center mx-auto mb-6 animate-bounce">
                   <FiLock className="w-12 h-12 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Submitting Report</h3>
-                <p className="text-slate-300 mb-6">Your lost item report is being processed...</p>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Submitting Report
+                </h3>
+                <p className="text-slate-300 mb-6">
+                  Your lost item report is being processed...
+                </p>
                 <div className="w-full bg-white/10 backdrop-blur-sm rounded-full h-2">
                   <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-600 rounded-full animate-pulse"></div>
                 </div>
@@ -864,18 +1081,33 @@ const ReportLost = () => {
       </div>
 
       {/* Add custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+          0%,
+          100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
         }
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
         @keyframes float-reverse {
-          0%, 100% { transform: translateY(-20px); }
-          50% { transform: translateY(0px); }
+          0%,
+          100% {
+            transform: translateY(-20px);
+          }
+          50% {
+            transform: translateY(0px);
+          }
         }
         @keyframes slide-right {
           from {
@@ -919,31 +1151,65 @@ const ReportLost = () => {
           }
         }
         @keyframes particle {
-          0% { transform: translateY(0px) translateX(0px); opacity: 0; }
-          10% { opacity: 1; }
-          100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
+          0% {
+            transform: translateY(0px) translateX(0px);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-100px) translateX(20px);
+            opacity: 0;
+          }
         }
         @keyframes draw {
-          to { stroke-dashoffset: 0; }
+          to {
+            stroke-dashoffset: 0;
+          }
         }
         @keyframes ping-slow {
-          0% { transform: scale(1); opacity: 0.8; }
-          100% { transform: scale(1.5); opacity: 0; }
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.5);
+            opacity: 0;
+          }
         }
-        
-        .animate-gradient { 
+
+        .animate-gradient {
           background-size: 200% 200%;
-          animation: gradient 3s ease infinite; 
+          animation: gradient 3s ease infinite;
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-float-reverse { animation: float-reverse 8s ease-in-out infinite; }
-        .animate-slide-right { animation: slide-right 0.5s ease-out; }
-        .animate-slide-up { animation: slide-up 0.5s ease-out; }
-        .animate-pop { animation: pop 0.4s ease-out; }
-        .animate-shimmer { animation: shimmer 1.5s infinite; }
-        .animate-particle { animation: particle linear infinite; }
-        .animate-draw { animation: draw 3s linear forwards; }
-        .animate-ping-slow { animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animate-float-reverse {
+          animation: float-reverse 8s ease-in-out infinite;
+        }
+        .animate-slide-right {
+          animation: slide-right 0.5s ease-out;
+        }
+        .animate-slide-up {
+          animation: slide-up 0.5s ease-out;
+        }
+        .animate-pop {
+          animation: pop 0.4s ease-out;
+        }
+        .animate-shimmer {
+          animation: shimmer 1.5s infinite;
+        }
+        .animate-particle {
+          animation: particle linear infinite;
+        }
+        .animate-draw {
+          animation: draw 3s linear forwards;
+        }
+        .animate-ping-slow {
+          animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
       `}</style>
     </div>
   );

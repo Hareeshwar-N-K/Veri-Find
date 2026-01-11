@@ -4,7 +4,6 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
 
-
 // Pages
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -21,6 +20,7 @@ import NotFound from "./pages/NotFound";
 import AboutPage from "./pages/AboutPage";
 
 import "./App.css";
+import Settings from "./pages/Settings";
 
 const App = () => {
   return (
@@ -59,6 +59,7 @@ const App = () => {
               {/* User Routes */}
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/settings" element={<Settings />} />
               <Route path="/report-lost" element={<ReportLost />} />
               <Route path="/report-found" element={<ReportFound />} />
               <Route path="/item/:id" element={<ItemStatus />} />

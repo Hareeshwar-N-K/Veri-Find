@@ -22,7 +22,12 @@ import {
   FaChartLine,
 } from "react-icons/fa";
 import { useAuth } from "../contexts/AuthContext";
-import { getMatch, updateMatchStatus } from "../services/firestore";
+import {
+  getMatch,
+  updateMatchStatus,
+  getLostItem,
+  getFoundItem,
+} from "../services/firestore";
 import { verifyMatch } from "../services/matching";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
@@ -33,6 +38,8 @@ const MatchDetail = () => {
   const { user } = useAuth();
 
   const [match, setMatch] = useState(null);
+  const [lostItem, setLostItem] = useState(null);
+  const [foundItem, setFoundItem] = useState(null);
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -59,7 +66,57 @@ const MatchDetail = () => {
     try {
       setLoading(true);
       const matchData = await getMatch(id);
+      console.log("Fetched match data:", matchData);
+
+      if (!matchData) {
+        setMatch(null);
+        return;
+      }
+
       setMatch(matchData);
+
+      // Fetch full item details if breakdown or locations are missing
+      if (
+        !matchData.breakdown ||
+        !matchData.lostLocation ||
+        !matchData.foundLocation
+      ) {
+        console.log("Fetching full item details...");
+
+        // Fetch lost and found items
+        const [lostItemData, foundItemData] = await Promise.all([
+          getLostItem(matchData.lostItemId),
+          getFoundItem(matchData.foundItemId),
+        ]);
+
+        console.log("Lost item:", lostItemData);
+        console.log("Found item:", foundItemData);
+
+        setLostItem(lostItemData);
+        setFoundItem(foundItemData);
+
+        // Update match with missing data
+        setMatch((prev) => ({
+          ...prev,
+          breakdown: prev.breakdown || {
+            title: 0,
+            description: 0,
+            location: 0,
+            date: 0,
+            category: 0,
+          },
+          lostLocation: prev.lostLocation || lostItemData?.locationLost,
+          foundLocation: prev.foundLocation || foundItemData?.locationFound,
+          lostItemTitle: prev.lostItemTitle || lostItemData?.title,
+          lostItemDescription:
+            prev.lostItemDescription || lostItemData?.description,
+          foundItemTitle: prev.foundItemTitle || foundItemData?.title,
+          foundItemDescription:
+            prev.foundItemDescription || foundItemData?.description,
+          lostDate: prev.lostDate || lostItemData?.dateLost,
+          foundDate: prev.foundDate || foundItemData?.dateFound,
+        }));
+      }
     } catch (error) {
       console.error("Error fetching match:", error);
       toast.error("Failed to load match details");
@@ -357,7 +414,10 @@ const MatchDetail = () => {
                         <div>
                           <p className="text-sm text-gray-400">Location</p>
                           <p className="font-medium">
-                            {match.lostLocation?.name || "Unknown"}
+                            {match.lostLocation?.name ||
+                              match.lostLocation?.address ||
+                              match.lostLocation ||
+                              "Unknown"}
                           </p>
                         </div>
                         <div>
@@ -408,7 +468,10 @@ const MatchDetail = () => {
                             Location Found
                           </p>
                           <p className="font-medium">
-                            {match.foundLocation?.name || "Unknown"}
+                            {match.foundLocation?.name ||
+                              match.foundLocation?.address ||
+                              match.foundLocation ||
+                              "Unknown"}
                           </p>
                         </div>
                         <div>

@@ -21,7 +21,7 @@ import {
   increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
-import { COLLECTIONS } from "./firestore";
+import { COLLECTIONS, createNotification } from "./firestore";
 import { generateVerificationQuestion } from "../utils/ai";
 
 /**
@@ -256,7 +256,10 @@ export async function createMatch(lostItem, foundItem, scoreData) {
   }
 
   // Extract score and breakdown from scoreData
-  const score = typeof scoreData === 'number' ? scoreData : scoreData.score;
+  const score =
+    typeof scoreData === "number"
+      ? scoreData
+      : scoreData.score || scoreData.aiScore || 0;
   const breakdown = scoreData.breakdown || {
     category: 0,
     title: 0,
@@ -264,6 +267,10 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     location: 0,
     date: 0,
   };
+
+  console.log("Score data received:", scoreData);
+  console.log("Extracted score:", score);
+  console.log("Extracted breakdown:", breakdown);
 
   // Generate AI verification quiz using comprehensive item data
   console.log("Generating AI verification questions (3 MCQs)...");
@@ -351,6 +358,33 @@ export async function createMatch(lostItem, foundItem, scoreData) {
   console.log("Match data to create:", matchData);
 
   const docRef = await addDoc(collection(db, COLLECTIONS.MATCHES), matchData);
+  const matchId = docRef.id;
+
+  // Create notification for owner
+  try {
+    await createNotification({
+      userId: lostItem.ownerId,
+      type: "match_found",
+      message: `🎯 Potential match found for your ${lostItem.category}: "${lostItem.title}"`,
+      link: `/match/${matchId}`,
+      matchId: matchId,
+    });
+  } catch (error) {
+    console.error("Failed to create owner notification:", error);
+  }
+
+  // Create notification for finder
+  try {
+    await createNotification({
+      userId: foundItem.finderId,
+      type: "match_created",
+      message: `✨ Your found ${foundItem.category} matched with a lost item report`,
+      link: `/match/${matchId}`,
+      matchId: matchId,
+    });
+  } catch (error) {
+    console.error("Failed to create finder notification:", error);
+  }
 
   // Update both items status to "matched"
   await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItem.id), {

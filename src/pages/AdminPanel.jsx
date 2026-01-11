@@ -312,7 +312,7 @@ const AdminPanel = () => {
     labels: Object.keys(categoryStats),
     datasets: [
       {
-        data: Object.values(categoryStats),
+        data: Object.values(categoryStats).map((val) => Number(val) || 0),
         backgroundColor: [
           "rgba(59, 130, 246, 0.8)",
           "rgba(16, 185, 129, 0.8)",
@@ -332,6 +332,36 @@ const AdminPanel = () => {
     plugins: {
       legend: {
         position: "bottom",
+        labels: {
+          color: "#e5e7eb",
+        },
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            const label = context.label || "";
+            const value = context.parsed || 0;
+            return label + ": " + value;
+          },
+        },
+      },
+    },
+    scales: {
+      x: {
+        ticks: {
+          color: "#9ca3af",
+        },
+        grid: {
+          color: "rgba(255, 255, 255, 0.1)",
+        },
+      },
+      y: {
+        ticks: {
+          color: "#9ca3af",
+        },
+        grid: {
+          color: "rgba(255, 255, 255, 0.1)",
+        },
       },
     },
   };

@@ -40,7 +40,8 @@ export const COLLECTIONS = {
   RECOVERY_LEDGER: "recovery_ledger",
   AUDIT_LOGS: "audit_logs",
   CHAT_CHANNELS: "chat_channels",
-  SYSTEM_SETTINGS: "systemSettings", // Added this line
+  SYSTEM_SETTINGS: "systemSettings",
+  NOTIFICATIONS: "notifications",
 };
 
 // ============================================
@@ -694,6 +695,111 @@ export async function getDashboardStats() {
     verifiedMatches: matches.docs.filter((d) => d.data().status === "verified")
       .length,
   };
+}
+
+// ============================================
+// 🔔 NOTIFICATION OPERATIONS
+// ============================================
+
+/**
+ * Get user's notifications
+ */
+export async function getUserNotifications(userId, limitCount = 10) {
+  const q = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(limitCount)
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+}
+
+/**
+ * Create a notification
+ */
+export async function createNotification(notificationData) {
+  const notification = {
+    ...notificationData,
+    read: false,
+    createdAt: serverTimestamp(),
+  };
+
+  const docRef = await addDoc(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    notification
+  );
+  return { id: docRef.id, ...notification };
+}
+
+/**
+ * Mark notification as read
+ */
+export async function markNotificationAsRead(notificationId) {
+  const notificationRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
+  await updateDoc(notificationRef, {
+    read: true,
+    readAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Mark all user notifications as read
+ */
+export async function markAllNotificationsAsRead(userId) {
+  const q = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where("userId", "==", userId),
+    where("read", "==", false)
+  );
+
+  const snapshot = await getDocs(q);
+  const updatePromises = snapshot.docs.map((doc) =>
+    updateDoc(doc.ref, {
+      read: true,
+      readAt: serverTimestamp(),
+    })
+  );
+
+  await Promise.all(updatePromises);
+}
+
+/**
+ * Delete a notification
+ */
+export async function deleteNotification(notificationId) {
+  await deleteDoc(doc(db, COLLECTIONS.NOTIFICATIONS, notificationId));
+}
+
+/**
+ * Subscribe to user notifications in real-time
+ */
+export function subscribeToNotifications(userId, callback, onError = null) {
+  const q = query(
+    collection(db, COLLECTIONS.NOTIFICATIONS),
+    where("userId", "==", userId),
+    orderBy("createdAt", "desc"),
+    limit(20)
+  );
+
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const notifications = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      callback(notifications);
+    },
+    (error) => {
+      if (onError) {
+        onError(error);
+      } else {
+        console.error("Error in notifications subscription:", error);
+      }
+    }
+  );
 }
 
 export default {

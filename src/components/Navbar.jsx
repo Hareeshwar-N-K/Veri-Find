@@ -24,7 +24,12 @@ import {
   FaRegCompass,
   FaTrophy,
 } from "react-icons/fa";
-import { getUserRank } from "../services/firestore";
+import {
+  getUserRank,
+  subscribeToNotifications,
+  markNotificationAsRead,
+  getUser,
+} from "../services/firestore";
 import { formatRankDisplay, getRankTier } from "../utils/helpers";
 
 function Navbar() {
@@ -32,6 +37,8 @@ function Navbar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [userRank, setUserRank] = useState({
     rank: null,
     totalUsers: 0,
@@ -43,12 +50,44 @@ function Navbar() {
   const profileRef = useRef(null);
   const notificationsRef = useRef(null);
 
-  // Fetch user rank
+  // Fetch user rank and settings
   useEffect(() => {
     if (currentUser?.uid) {
       getUserRank(currentUser.uid).then(setUserRank);
+
+      // Fetch user notification settings
+      getUser(currentUser.uid).then((userData) => {
+        if (userData) {
+          setNotificationsEnabled(userData.notificationsEnabled ?? true);
+        }
+      });
     }
   }, [currentUser]);
+
+  // Subscribe to real-time notifications
+  useEffect(() => {
+    if (currentUser?.uid && notificationsEnabled) {
+      const unsubscribe = subscribeToNotifications(
+        currentUser.uid,
+        (newNotifications) => {
+          setNotifications(newNotifications);
+        },
+        (error) => {
+          // Handle index building error gracefully
+          if (error.code === "failed-precondition") {
+            console.log("Notification index is building, please wait...");
+            setNotifications([]);
+          } else {
+            console.error("Error loading notifications:", error);
+          }
+        }
+      );
+
+      return () => unsubscribe();
+    } else {
+      setNotifications([]);
+    }
+  }, [currentUser, notificationsEnabled]);
 
   // Handle scroll effect
   useEffect(() => {
@@ -92,22 +131,35 @@ function Navbar() {
     { path: "/dashboard", label: "Dashboard", icon: FiGrid },
   ];
 
-  // Mock notifications
-  const notifications = [
-    {
-      id: 1,
-      text: "New match found for your lost wallet",
-      time: "2 min ago",
-      read: false,
-    },
-    {
-      id: 2,
-      text: "Your found item was verified",
-      time: "1 hour ago",
-      read: true,
-    },
-    { id: 3, text: "System update completed", time: "3 hours ago", read: true },
-  ];
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read) {
+      await markNotificationAsRead(notification.id);
+    }
+    if (notification.link) {
+      navigate(notification.link);
+      setIsNotificationsOpen(false);
+    }
+  };
+
+  const formatNotificationTime = (timestamp) => {
+    if (!timestamp) return "Just now";
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 3600)
+      return `${Math.floor(diffInSeconds / 60)} min ago`;
+    if (diffInSeconds < 86400)
+      return `${Math.floor(diffInSeconds / 3600)} hour${
+        Math.floor(diffInSeconds / 3600) > 1 ? "s" : ""
+      } ago`;
+    return `${Math.floor(diffInSeconds / 86400)} day${
+      Math.floor(diffInSeconds / 86400) > 1 ? "s" : ""
+    } ago`;
+  };
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <>
@@ -178,7 +230,7 @@ function Navbar() {
             {/* Right Side - Auth/User Profile */}
             <div className="hidden md:flex items-center space-x-3">
               {/* Notifications */}
-              {currentUser && (
+              {currentUser && notificationsEnabled && (
                 <div className="relative" ref={notificationsRef}>
                   <button
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
@@ -186,8 +238,12 @@ function Navbar() {
                   >
                     <FiBell className="w-5 h-5 group-hover:scale-110 transition-transform" />
                     {/* Unread Indicator */}
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping opacity-75"></div>
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-gray-900"></div>
+                    {unreadCount > 0 && (
+                      <>
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping opacity-75"></div>
+                        <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-gray-900"></div>
+                      </>
+                    )}
                   </button>
 
                   {/* Notifications Dropdown */}
@@ -200,23 +256,33 @@ function Navbar() {
                         <p className="text-sm text-cyan-300">Recent alerts</p>
                       </div>
                       <div className="max-h-72 overflow-y-auto">
-                        {notifications.map((notif) => (
-                          <div
-                            key={notif.id}
-                            className={`px-4 py-3 hover:bg-white/5 transition-colors ${
-                              !notif.read
-                                ? "border-l-2 border-cyan-500 bg-cyan-500/5"
-                                : ""
-                            }`}
-                          >
-                            <p className="text-sm text-gray-200">
-                              {notif.text}
-                            </p>
-                            <p className="text-xs text-cyan-400 mt-1">
-                              {notif.time}
+                        {notifications.length === 0 ? (
+                          <div className="px-4 py-8 text-center">
+                            <FiBell className="w-12 h-12 mx-auto text-gray-500 mb-2" />
+                            <p className="text-sm text-gray-400">
+                              No notifications yet
                             </p>
                           </div>
-                        ))}
+                        ) : (
+                          notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`px-4 py-3 hover:bg-white/5 transition-colors cursor-pointer ${
+                                !notif.read
+                                  ? "border-l-2 border-cyan-500 bg-cyan-500/5"
+                                  : ""
+                              }`}
+                            >
+                              <p className="text-sm text-gray-200">
+                                {notif.message}
+                              </p>
+                              <p className="text-xs text-cyan-400 mt-1">
+                                {formatNotificationTime(notif.createdAt)}
+                              </p>
+                            </div>
+                          ))
+                        )}
                       </div>
                       <div className="px-4 pt-3 border-t border-white/10">
                         <Link
