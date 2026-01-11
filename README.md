@@ -32,6 +32,7 @@ cd veri-find
 ```bash
 npm install
 npm install @react-google-maps/api
+npm install @googlemaps/js-api-loader
 
 ```
 
