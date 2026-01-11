@@ -225,7 +225,7 @@ export async function findMatchesForFoundItem(foundItem, minScore = 0.4) {
 /**
  * Create a match record between a lost item and found item
  */
-export async function createMatch(lostItem, foundItem, score) {
+export async function createMatch(lostItem, foundItem, scoreData) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
@@ -254,6 +254,16 @@ export async function createMatch(lostItem, foundItem, score) {
   if (!isOwner && !isFinder) {
     throw new Error("You must be the owner or finder to create a match");
   }
+
+  // Extract score and breakdown from scoreData
+  const score = typeof scoreData === 'number' ? scoreData : scoreData.score;
+  const breakdown = scoreData.breakdown || {
+    category: 0,
+    title: 0,
+    description: 0,
+    location: 0,
+    date: 0,
+  };
 
   // Generate AI verification quiz using comprehensive item data
   console.log("Generating AI verification questions (3 MCQs)...");
@@ -320,11 +330,20 @@ export async function createMatch(lostItem, foundItem, score) {
     finderId: foundItem.finderId,
     finderName: foundItem.finderName || "Anonymous",
     aiScore: score,
+    breakdown: breakdown,
     status: "pending_verification",
     verificationQuiz,
     ownerAnswer: null,
     itemCategory: lostItem.category,
     itemTitle: lostItem.title,
+    lostItemTitle: lostItem.title,
+    lostItemDescription: lostItem.description,
+    foundItemTitle: foundItem.title,
+    foundItemDescription: foundItem.description,
+    lostLocation: lostItem.locationLost,
+    foundLocation: foundItem.locationFound,
+    lostDate: lostItem.dateLost,
+    foundDate: foundItem.dateFound,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };

@@ -127,11 +127,11 @@ const ItemStatus = () => {
 
       if (itemType === "lost") {
         // Creating match from lost item perspective
-        await createMatch(item, matchData.foundItem, matchData.score);
+        await createMatch(item, matchData.foundItem, matchData);
         toast.success("Match created! Waiting for verification.");
       } else {
         // Creating match from found item perspective
-        await createMatch(matchData.lostItem, item, matchData.score);
+        await createMatch(matchData.lostItem, item, matchData);
         toast.success("Match created! Owner will be notified.");
       }
 

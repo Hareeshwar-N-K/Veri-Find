@@ -1,12 +1,12 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { 
-  FiTwitter, 
-  FiInstagram, 
+import {
+  FiTwitter,
+  FiInstagram,
   FiGithub,
   FiMail,
   FiMapPin,
-  FiPhone
+  FiPhone,
 } from "react-icons/fi";
 import { FaRocket, FaDiscord, FaLinkedin } from "react-icons/fa";
 
@@ -30,7 +30,11 @@ function Footer() {
 
   const socialLinks = [
     { icon: <FiTwitter className="w-5 h-5" />, href: "#", label: "Twitter" },
-    { icon: <FiInstagram className="w-5 h-5" />, href: "#", label: "Instagram" },
+    {
+      icon: <FiInstagram className="w-5 h-5" />,
+      href: "#",
+      label: "Instagram",
+    },
     { icon: <FaDiscord className="w-5 h-5" />, href: "#", label: "Discord" },
     { icon: <FiGithub className="w-5 h-5" />, href: "#", label: "GitHub" },
     { icon: <FaLinkedin className="w-5 h-5" />, href: "#", label: "LinkedIn" },
@@ -39,7 +43,10 @@ function Footer() {
   const contactInfo = [
     { icon: <FiMail className="w-5 h-5" />, text: "support@verifind.com" },
     { icon: <FiPhone className="w-5 h-5" />, text: "+1 (555) 123-4567" },
-    { icon: <FiMapPin className="w-5 h-5" />, text: "Campus Tech Hub, University City" },
+    {
+      icon: <FiMapPin className="w-5 h-5" />,
+      text: "Coimbatore Institute of Technology, Coimbatore",
+    },
   ];
 
   return (
@@ -54,7 +61,7 @@ function Footer() {
               left: `${5 + i * 8}%`,
               top: `${20 + Math.sin(i) * 60}%`,
               animationDelay: `${i * 0.2}s`,
-              animationDuration: '8s',
+              animationDuration: "8s",
             }}
           />
         ))}
@@ -79,9 +86,10 @@ function Footer() {
               </div>
             </div>
             <p className="text-gray-400 mb-8 max-w-md text-lg leading-relaxed">
-              The smartest campus lost & found platform powered by AI to reunite you with your belongings in record time.
+              The smartest campus lost & found platform powered by AI to reunite
+              you with your belongings in record time.
             </p>
-            
+
             {/* Contact Info */}
             <div className="space-y-4">
               {contactInfo.map((info, index) => (
@@ -99,9 +107,7 @@ function Footer() {
 
           {/* Quick Links Column */}
           <div>
-            <h3 className="text-xl font-bold mb-6">
-              Quick Links
-            </h3>
+            <h3 className="text-xl font-bold mb-6">Quick Links</h3>
             <ul className="space-y-3">
               {quickLinks.map((link) => (
                 <li key={link.path}>
@@ -119,9 +125,7 @@ function Footer() {
 
           {/* Support Column */}
           <div>
-            <h3 className="text-xl font-bold mb-6">
-              Support
-            </h3>
+            <h3 className="text-xl font-bold mb-6">Support</h3>
             <ul className="space-y-3">
               {supportLinks.map((link) => (
                 <li key={link.path}>
@@ -158,9 +162,7 @@ function Footer() {
                 aria-label={social.label}
                 className="group relative p-3 rounded-xl bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border border-cyan-500/20 text-cyan-300 hover:text-white hover:border-cyan-400 transition-all duration-300"
               >
-                <div className="relative z-10">
-                  {social.icon}
-                </div>
+                <div className="relative z-10">{social.icon}</div>
                 <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-xl blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               </a>
             ))}
@@ -169,12 +171,14 @@ function Footer() {
 
         {/* Back to Top */}
         <button
-          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
           className="group fixed bottom-8 right-8 md:right-12 z-50"
         >
           <div className="absolute -inset-4 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
           <div className="relative w-12 h-12 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center text-2xl shadow-2xl hover:scale-110 transition-transform duration-300 group">
-            <span className="transform rotate-90 group-hover:-translate-y-1 transition-transform">↥</span>
+            <span className="transform rotate-90 group-hover:-translate-y-1 transition-transform">
+              ↥
+            </span>
           </div>
         </button>
       </div>
