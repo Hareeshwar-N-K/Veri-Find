@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
+
 function Home() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ function Home() {
     if (currentUser) {
       const adminEmails = [
         "kavinvk26@gmail.com",
+        "aishwaryaa5432@gmail.com",
         "admin@example.com",
         "superuser@gmail.com",
         "admin@gmail.com",
@@ -140,54 +142,7 @@ function Home() {
         ></div>
       </div>
 
-      {/* Navigation */}
-      <nav className="relative z-50 py-6 px-6 lg:px-20">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-cyan-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <span className="text-2xl">🔍</span>
-            </div>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
-              VeriFind
-            </h1>
-          </div>
-          
-          <div className="flex items-center gap-6">
-            {currentUser ? (
-              <>
-                {redirecting ? (
-                  <span className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-cyan-400">
-                    👑 Admin Mode
-                  </span>
-                ) : (
-                  <Link to="/dashboard" className="px-6 py-2.5 rounded-lg bg-white/10 backdrop-blur-sm border border-white/20 hover:bg-white/20 transition-all duration-300">
-                    Dashboard
-                  </Link>
-                )}
-                <div className="flex items-center gap-3">
-                  <img
-                    src={currentUser.photoURL || `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.email || 'user'}`}
-                    className="w-10 h-10 rounded-full border-2 border-cyan-500"
-                    alt="Profile"
-                  />
-                  <span className="hidden md:inline text-slate-300">
-                    Hi, {currentUser.displayName?.split(" ")[0] || "User"}!
-                  </span>
-                </div>
-              </>
-            ) : (
-              <>
-                <Link to="/login" className="px-6 py-2.5 rounded-lg border border-cyan-500/50 hover:bg-cyan-500/10 transition-all duration-300">
-                  Sign In
-                </Link>
-                <Link to="/register" className="px-6 py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:shadow-[0_0_30px_rgba(34,211,238,0.5)] transition-all duration-300">
-                  Get Started
-                </Link>
-              </>
-            )}
-          </div>
-        </div>
-      </nav>
+
 
       {/* Hero Section */}
       <section className="relative z-10 py-20 px-6 lg:px-20">

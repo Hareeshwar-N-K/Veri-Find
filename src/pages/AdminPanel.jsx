@@ -108,6 +108,7 @@ const AdminPanel = () => {
     try {
       const adminEmails = [
         "kavinvk26@gmail.com",
+        "aishwaryaa5432@gmail.com",
         "admin@example.com", 
         "superuser@gmail.com",
         "admin@gmail.com",

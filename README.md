@@ -31,6 +31,8 @@ cd veri-find
 
 ```bash
 npm install
+npm install @react-google-maps/api
+
 ```
 
 3. Install Cloud Functions dependencies:
