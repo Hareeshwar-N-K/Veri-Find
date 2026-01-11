@@ -44,7 +44,7 @@ const MatchDetail = () => {
   const [verifying, setVerifying] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
-  
+
   // Quiz and recovery states
   const [showQuiz, setShowQuiz] = useState(false);
   const [quizAnswers, setQuizAnswers] = useState([]);
@@ -158,8 +158,14 @@ const MatchDetail = () => {
     }
 
     // User clicked "Yes, This Is Mine" - Show quiz
-    if (match.verificationQuiz && match.verificationQuiz.questions && match.verificationQuiz.questions.length > 0) {
-      setQuizAnswers(new Array(match.verificationQuiz.questions.length).fill(null));
+    if (
+      match.verificationQuiz &&
+      match.verificationQuiz.questions &&
+      match.verificationQuiz.questions.length > 0
+    ) {
+      setQuizAnswers(
+        new Array(match.verificationQuiz.questions.length).fill(null)
+      );
       setShowQuiz(true);
     } else {
       // No quiz available, auto-verify (fallback)
@@ -181,7 +187,7 @@ const MatchDetail = () => {
     if (!match || !match.verificationQuiz) return;
 
     // Check if all questions are answered
-    const unanswered = quizAnswers.some(answer => answer === null);
+    const unanswered = quizAnswers.some((answer) => answer === null);
     if (unanswered) {
       toast.error("Please answer all questions before submitting");
       return;
@@ -193,7 +199,7 @@ const MatchDetail = () => {
       // Calculate score
       const questions = match.verificationQuiz.questions;
       let correctCount = 0;
-      
+
       questions.forEach((q, index) => {
         if (quizAnswers[index] === q.correctIndex) {
           correctCount++;
@@ -201,20 +207,26 @@ const MatchDetail = () => {
       });
 
       const totalQuestions = questions.length;
-      const requiredCorrect = Math.ceil(totalQuestions * 2 / 3); // 2/3 must be correct
+      const requiredCorrect = Math.ceil((totalQuestions * 2) / 3); // 2/3 must be correct
 
-      console.log(`Quiz result: ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`);
+      console.log(
+        `Quiz result: ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`
+      );
 
       if (correctCount >= requiredCorrect) {
         // Pass verification
         await updateMatchStatus(match.id, "verified");
-        toast.success(`✅ Verification Passed! (${correctCount}/${totalQuestions} correct)`);
+        toast.success(
+          `✅ Verification Passed! (${correctCount}/${totalQuestions} correct)`
+        );
         setShowQuiz(false);
         fetchMatch();
       } else {
         // Fail verification
         await updateMatchStatus(match.id, "rejected");
-        toast.error(`❌ Verification Failed. Only ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`);
+        toast.error(
+          `❌ Verification Failed. Only ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`
+        );
         setShowQuiz(false);
         fetchMatch();
       }
@@ -231,7 +243,7 @@ const MatchDetail = () => {
 
     try {
       setConfirming(true);
-      
+
       if (recovered) {
         await updateMatchStatus(match.id, "recovered");
         toast.success("🎉 Item marked as recovered! Congratulations!");
@@ -245,7 +257,7 @@ const MatchDetail = () => {
           },
         });
       }
-      
+
       setShowRecoveryConfirm(false);
       fetchMatch();
     } catch (error) {
@@ -764,7 +776,8 @@ const MatchDetail = () => {
                           : "bg-gradient-to-r from-orange-500 to-yellow-500 animate-pulse"
                       }`}
                     ></div>
-                    {(match.status === "verified" || match.status === "recovered") && (
+                    {(match.status === "verified" ||
+                      match.status === "recovered") && (
                       <div className="w-0.5 h-12 bg-gradient-to-b from-green-500 to-emerald-500 mt-2"></div>
                     )}
                   </div>
@@ -779,7 +792,8 @@ const MatchDetail = () => {
                         : "Ownership Verified ✓"}
                     </p>
                     <p className="text-sm text-gray-400">
-                      {match.status !== "pending_verification" && match.updatedAt
+                      {match.status !== "pending_verification" &&
+                      match.updatedAt
                         ? formatDate(match.updatedAt)
                         : "Awaiting verification"}
                     </p>
@@ -787,7 +801,8 @@ const MatchDetail = () => {
                 </div>
 
                 {/* Recovery Step - Only show if verified or recovered */}
-                {(match.status === "verified" || match.status === "recovered") && (
+                {(match.status === "verified" ||
+                  match.status === "recovered") && (
                   <div className="flex items-start">
                     <div className="flex flex-col items-center mr-4">
                       <div
@@ -889,9 +904,13 @@ const MatchDetail = () => {
             <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
               <p className="text-orange-200 text-sm">
                 <FiAlertCircle className="inline mr-2" />
-                Please answer the following questions to verify ownership. You need at least{" "}
-                <strong>{Math.ceil(match.verificationQuiz.questions.length * 2 / 3)} out of{" "}
-                {match.verificationQuiz.questions.length}</strong> correct answers to proceed.
+                Please answer the following questions to verify ownership. You
+                need at least{" "}
+                <strong>
+                  {Math.ceil((match.verificationQuiz.questions.length * 2) / 3)}{" "}
+                  out of {match.verificationQuiz.questions.length}
+                </strong>{" "}
+                correct answers to proceed.
               </p>
             </div>
 
@@ -956,7 +975,7 @@ const MatchDetail = () => {
               </button>
               <button
                 onClick={handleSubmitQuiz}
-                disabled={verifying || quizAnswers.some(a => a === null)}
+                disabled={verifying || quizAnswers.some((a) => a === null)}
                 className="flex-1 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {verifying ? "Verifying..." : "Submit Answers"}

@@ -671,12 +671,12 @@ export async function updateMatchStatus(matchId, status, notes = "") {
     adminNotes: notes,
     updatedAt: serverTimestamp(),
   };
-  
+
   // Add recoveredAt timestamp if status is recovered
   if (status === "recovered") {
     updateData.recoveredAt = serverTimestamp();
   }
-  
+
   await updateDoc(matchRef, updateData);
 }
 
