@@ -666,11 +666,18 @@ export async function getAllMatches(limitCount = 50) {
  */
 export async function updateMatchStatus(matchId, status, notes = "") {
   const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
-  await updateDoc(matchRef, {
+  const updateData = {
     status: status,
     adminNotes: notes,
     updatedAt: serverTimestamp(),
-  });
+  };
+  
+  // Add recoveredAt timestamp if status is recovered
+  if (status === "recovered") {
+    updateData.recoveredAt = serverTimestamp();
+  }
+  
+  await updateDoc(matchRef, updateData);
 }
 
 /**

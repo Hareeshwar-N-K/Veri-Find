@@ -63,9 +63,20 @@ const ItemStatus = () => {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [id]);
 
+  // Re-fetch data when user becomes available (handles refresh case)
+  useEffect(() => {
+    if (user && item) {
+      // Re-fetch to get matches now that user is available
+      fetchItemData();
+    }
+  }, [user]);
+
   const fetchItemData = async () => {
     try {
       setLoading(true);
+      // Reset matches when fetching new data
+      setPotentialMatches([]);
+      setExistingMatches([]);
 
       // Try to find in lost_items first
       let itemData = await getLostItem(id);
@@ -561,8 +572,8 @@ const ItemStatus = () => {
               </div>
             </div>
 
-            {/* Potential Matches */}
-            {isOwner && potentialMatches.length > 0 && (
+            {/* Potential Matches - Only show for lost items (owners can claim found items) */}
+            {isOwner && itemType === "lost" && potentialMatches.length > 0 && (
               <div className="group relative rounded-3xl p-8 backdrop-blur-sm border border-white/10 hover:border-cyan-500/30 transition-all duration-500 bg-gradient-to-br from-white/5 to-white/10">
                 <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/5 to-orange-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
                 <div className="relative z-10">

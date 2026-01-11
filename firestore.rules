@@ -110,9 +110,13 @@ service cloud.firestore {
       
       // Finder can update their own item (limited fields)
       allow update: if isOwner(resource.data.finderId)
-        && isNotSuspended()
-        && onlyUpdating(['title', 'description', 'currentStorageLocation', 'images', 'updatedAt'])
+        && onlyUpdating(['title', 'description', 'currentStorageLocation', 'images', 'status', 'updatedAt'])
         && request.resource.data.finderId == resource.data.finderId; // Can't change finder
+      
+      // Allow authenticated users to update status to 'matched' (for match creation)
+      allow update: if isAuthenticated()
+        && onlyUpdating(['status', 'updatedAt'])
+        && request.resource.data.status == 'matched';
       
       // Admins/Moderators can update status and other fields
       allow update: if isModerator();
@@ -138,8 +142,12 @@ service cloud.firestore {
       
       // Owner can update their own item
       allow update: if isOwner(resource.data.ownerId)
-        && isNotSuspended()
         && request.resource.data.ownerId == resource.data.ownerId; // Can't change owner
+      
+      // Allow authenticated users to update status to 'matched' (for match creation)
+      allow update: if isAuthenticated()
+        && onlyUpdating(['status', 'updatedAt'])
+        && request.resource.data.status == 'matched';
       
       // Admins/Moderators can update
       allow update: if isModerator();
@@ -164,19 +172,15 @@ service cloud.firestore {
       // Validate that the creator is either the owner or finder
       // Note: createdAt uses serverTimestamp() so we don't require it in hasRequiredFields
       allow create: if isAuthenticated()
-        && isNotSuspended()
-        && hasRequiredFields(['ownerId', 'finderId', 'lostItemId', 'foundItemId', 'status'])
         && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid)
         && request.resource.data.status in ['pending_verification', 'pending'];
       
       // Owner can update to submit quiz answer and mark as recovered
       allow update: if isOwner(resource.data.ownerId)
-        && isNotSuspended()
         && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'status', 'recoveredAt', 'updatedAt', 'adminNotes']);
       
       // Finder can update limited fields
       allow update: if isOwner(resource.data.finderId)
-        && isNotSuspended()
         && onlyUpdating(['finderNotes', 'status', 'updatedAt', 'adminNotes']);
       
       // Admins/Moderators can update status

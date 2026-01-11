@@ -44,6 +44,12 @@ const MatchDetail = () => {
   const [verifying, setVerifying] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [isVisible, setIsVisible] = useState(false);
+  
+  // Quiz and recovery states
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState([]);
+  const [showRecoveryConfirm, setShowRecoveryConfirm] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
     fetchMatch();
@@ -128,15 +134,10 @@ const MatchDetail = () => {
   const handleVerify = async (isValid) => {
     if (!user || !match) return;
 
-    try {
-      setVerifying(true);
-
-      if (isValid) {
-        // For now, auto-approve without quiz if no questions are present
-        // In production, you should show quiz questions here
-        await updateMatchStatus(match.id, "verified");
-        toast.success("Match verified successfully!");
-      } else {
+    if (!isValid) {
+      // User clicked "Not My Item"
+      try {
+        setVerifying(true);
         await updateMatchStatus(match.id, "rejected");
         toast("Match rejected", {
           icon: "ℹ️",
@@ -146,14 +147,112 @@ const MatchDetail = () => {
             border: "1px solid rgba(255,255,255,0.1)",
           },
         });
+        fetchMatch();
+      } catch (error) {
+        console.error("Error rejecting match:", error);
+        toast.error("Failed to reject match");
+      } finally {
+        setVerifying(false);
       }
+      return;
+    }
 
-      fetchMatch();
+    // User clicked "Yes, This Is Mine" - Show quiz
+    if (match.verificationQuiz && match.verificationQuiz.questions && match.verificationQuiz.questions.length > 0) {
+      setQuizAnswers(new Array(match.verificationQuiz.questions.length).fill(null));
+      setShowQuiz(true);
+    } else {
+      // No quiz available, auto-verify (fallback)
+      try {
+        setVerifying(true);
+        await updateMatchStatus(match.id, "verified");
+        toast.success("Match verified successfully!");
+        fetchMatch();
+      } catch (error) {
+        console.error("Error verifying match:", error);
+        toast.error("Failed to verify match");
+      } finally {
+        setVerifying(false);
+      }
+    }
+  };
+
+  const handleSubmitQuiz = async () => {
+    if (!match || !match.verificationQuiz) return;
+
+    // Check if all questions are answered
+    const unanswered = quizAnswers.some(answer => answer === null);
+    if (unanswered) {
+      toast.error("Please answer all questions before submitting");
+      return;
+    }
+
+    try {
+      setVerifying(true);
+
+      // Calculate score
+      const questions = match.verificationQuiz.questions;
+      let correctCount = 0;
+      
+      questions.forEach((q, index) => {
+        if (quizAnswers[index] === q.correctIndex) {
+          correctCount++;
+        }
+      });
+
+      const totalQuestions = questions.length;
+      const requiredCorrect = Math.ceil(totalQuestions * 2 / 3); // 2/3 must be correct
+
+      console.log(`Quiz result: ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`);
+
+      if (correctCount >= requiredCorrect) {
+        // Pass verification
+        await updateMatchStatus(match.id, "verified");
+        toast.success(`✅ Verification Passed! (${correctCount}/${totalQuestions} correct)`);
+        setShowQuiz(false);
+        fetchMatch();
+      } else {
+        // Fail verification
+        await updateMatchStatus(match.id, "rejected");
+        toast.error(`❌ Verification Failed. Only ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`);
+        setShowQuiz(false);
+        fetchMatch();
+      }
     } catch (error) {
-      console.error("Error verifying match:", error);
-      toast.error("Failed to verify match");
+      console.error("Error submitting quiz:", error);
+      toast.error("Failed to submit verification");
     } finally {
       setVerifying(false);
+    }
+  };
+
+  const handleRecoveryConfirm = async (recovered) => {
+    if (!user || !match) return;
+
+    try {
+      setConfirming(true);
+      
+      if (recovered) {
+        await updateMatchStatus(match.id, "recovered");
+        toast.success("🎉 Item marked as recovered! Congratulations!");
+      } else {
+        toast("Item recovery pending", {
+          icon: "⏳",
+          style: {
+            background: "#1e293b",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.1)",
+          },
+        });
+      }
+      
+      setShowRecoveryConfirm(false);
+      fetchMatch();
+    } catch (error) {
+      console.error("Error updating recovery status:", error);
+      toast.error("Failed to update recovery status");
+    } finally {
+      setConfirming(false);
     }
   };
 
@@ -540,6 +639,43 @@ const MatchDetail = () => {
               </div>
             )}
 
+            {/* Recovery Confirmation - Show after verification */}
+            {isOwner && match.status === "verified" && (
+              <div
+                className={`bg-gradient-to-br from-emerald-500/10 to-teal-500/10 backdrop-blur-sm rounded-2xl p-6 border border-emerald-500/30 transition-all duration-1000 ${
+                  isVisible
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-10"
+                }`}
+              >
+                <h2 className="text-xl font-bold mb-6 flex items-center gap-3 text-emerald-300">
+                  <FiCheckCircle className="animate-pulse" />
+                  Confirm Recovery
+                </h2>
+                <p className="text-sm text-emerald-200/80 mb-6">
+                  Have you successfully received your item from the finder?
+                </p>
+                <div className="space-y-3">
+                  <button
+                    onClick={() => handleRecoveryConfirm(true)}
+                    disabled={confirming}
+                    className="group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 backdrop-blur-sm border border-emerald-500/30 text-emerald-300 rounded-xl hover:border-emerald-400 hover:text-emerald-200 transition-all duration-300 disabled:opacity-50"
+                  >
+                    <FiCheckCircle className="group-hover:scale-110 transition-transform" />
+                    {confirming ? "Confirming..." : "Yes, I Got My Item!"}
+                  </button>
+                  <button
+                    onClick={() => handleRecoveryConfirm(false)}
+                    disabled={confirming}
+                    className="group w-full flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r from-gray-500/20 to-gray-600/20 backdrop-blur-sm border border-gray-500/30 text-gray-300 rounded-xl hover:border-gray-400 hover:text-gray-200 transition-all duration-300 disabled:opacity-50"
+                  >
+                    <FiXCircle className="group-hover:scale-110 transition-transform" />
+                    {confirming ? "Processing..." : "Not Yet"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Contact Information */}
             {(isOwner || isFinder) && (
               <div
@@ -606,7 +742,7 @@ const MatchDetail = () => {
                 <div className="flex items-start">
                   <div className="flex flex-col items-center mr-4">
                     <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                    <div className="w-0.5 h-12 bg-gradient-to-b from-purple-500 to-pink-500 mt-2"></div>
+                    <div className="w-0.5 h-12 bg-gradient-to-b from-purple-500 to-orange-500 mt-2"></div>
                   </div>
                   <div>
                     <p className="font-bold text-white">AI Analysis</p>
@@ -625,27 +761,57 @@ const MatchDetail = () => {
                           ? "bg-gradient-to-r from-green-500 to-emerald-500"
                           : match.status === "rejected"
                           ? "bg-gradient-to-r from-red-500 to-pink-500"
-                          : "bg-gradient-to-r from-orange-500 to-yellow-500"
+                          : "bg-gradient-to-r from-orange-500 to-yellow-500 animate-pulse"
                       }`}
                     ></div>
+                    {(match.status === "verified" || match.status === "recovered") && (
+                      <div className="w-0.5 h-12 bg-gradient-to-b from-green-500 to-emerald-500 mt-2"></div>
+                    )}
                   </div>
                   <div>
                     <p className="font-bold text-white">
                       {match.status === "pending_verification"
                         ? "Verification Pending"
                         : match.status === "verified"
-                        ? "Verified"
+                        ? "Ownership Verified ✓"
                         : match.status === "rejected"
-                        ? "Rejected"
-                        : "Recovered"}
+                        ? "Verification Failed"
+                        : "Ownership Verified ✓"}
                     </p>
                     <p className="text-sm text-gray-400">
-                      {match.updatedAt
+                      {match.status !== "pending_verification" && match.updatedAt
                         ? formatDate(match.updatedAt)
-                        : "Pending"}
+                        : "Awaiting verification"}
                     </p>
                   </div>
                 </div>
+
+                {/* Recovery Step - Only show if verified or recovered */}
+                {(match.status === "verified" || match.status === "recovered") && (
+                  <div className="flex items-start">
+                    <div className="flex flex-col items-center mr-4">
+                      <div
+                        className={`w-3 h-3 rounded-full ${
+                          match.status === "recovered"
+                            ? "bg-gradient-to-r from-emerald-500 to-teal-500"
+                            : "bg-gray-500/50 animate-pulse"
+                        }`}
+                      ></div>
+                    </div>
+                    <div>
+                      <p className="font-bold text-white">
+                        {match.status === "recovered"
+                          ? "Item Recovered 🎉"
+                          : "Recovery Pending"}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {match.status === "recovered" && match.recoveredAt
+                          ? formatDate(match.recoveredAt)
+                          : "Waiting for confirmation"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -702,6 +868,103 @@ const MatchDetail = () => {
           </div>
         </div>
       </div>
+
+      {/* Verification Quiz Modal */}
+      {showQuiz && match.verificationQuiz && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-[#0A0F29] to-[#1E1B4B] border border-cyan-500/30 rounded-3xl p-8 max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent flex items-center gap-3">
+                <FaShieldAlt className="text-cyan-400" />
+                Ownership Verification
+              </h2>
+              <button
+                onClick={() => setShowQuiz(false)}
+                className="w-10 h-10 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300 flex items-center justify-center"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mb-6 p-4 rounded-xl bg-orange-500/10 border border-orange-500/30">
+              <p className="text-orange-200 text-sm">
+                <FiAlertCircle className="inline mr-2" />
+                Please answer the following questions to verify ownership. You need at least{" "}
+                <strong>{Math.ceil(match.verificationQuiz.questions.length * 2 / 3)} out of{" "}
+                {match.verificationQuiz.questions.length}</strong> correct answers to proceed.
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {match.verificationQuiz.questions.map((question, qIndex) => (
+                <div
+                  key={qIndex}
+                  className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-cyan-500/30 transition-all duration-300"
+                >
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-cyan-500 to-purple-600 flex items-center justify-center font-bold flex-shrink-0">
+                      {qIndex + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-lg font-semibold text-white mb-4">
+                        {question.question}
+                      </p>
+                      <div className="space-y-3">
+                        {question.options.map((option, oIndex) => (
+                          <button
+                            key={oIndex}
+                            onClick={() => {
+                              const newAnswers = [...quizAnswers];
+                              newAnswers[qIndex] = oIndex;
+                              setQuizAnswers(newAnswers);
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border transition-all duration-300 ${
+                              quizAnswers[qIndex] === oIndex
+                                ? "bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-cyan-500/50 text-white"
+                                : "bg-white/5 border-white/10 hover:border-white/30 text-gray-300"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                                  quizAnswers[qIndex] === oIndex
+                                    ? "border-cyan-500 bg-cyan-500"
+                                    : "border-gray-500"
+                                }`}
+                              >
+                                {quizAnswers[qIndex] === oIndex && (
+                                  <FiCheckCircle className="w-3 h-3 text-white" />
+                                )}
+                              </div>
+                              <span>{option}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex gap-4 mt-8">
+              <button
+                onClick={() => setShowQuiz(false)}
+                className="flex-1 px-6 py-4 bg-white/5 border border-white/10 rounded-xl font-semibold hover:bg-white/10 transition-all duration-300"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitQuiz}
+                disabled={verifying || quizAnswers.some(a => a === null)}
+                className="flex-1 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-xl font-semibold hover:opacity-90 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {verifying ? "Verifying..." : "Submit Answers"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

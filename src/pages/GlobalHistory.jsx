@@ -7,6 +7,7 @@ import {
   FiTag,
   FiTrendingUp,
   FiAward,
+  FiRefreshCw,
 } from "react-icons/fi";
 import { FaTrophy, FaMedal } from "react-icons/fa";
 import {
@@ -16,16 +17,22 @@ import {
   getDocs,
   orderBy,
   limit,
+  onSnapshot,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 import { COLLECTIONS } from "../services/firestore";
 import LoadingSpinner from "../components/LoadingSpinner";
 
+const CACHE_KEY = "global_history_cache";
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 const GlobalHistory = () => {
   const [recoveredItems, setRecoveredItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [stats, setStats] = useState({
     totalRecovered: 0,
     thisMonth: 0,
@@ -33,7 +40,17 @@ const GlobalHistory = () => {
   });
 
   useEffect(() => {
-    fetchRecoveredItems();
+    // Try to load from cache first
+    const cachedData = loadFromCache();
+    if (cachedData) {
+      setRecoveredItems(cachedData.items);
+      setStats(cachedData.stats);
+      setLastUpdated(cachedData.timestamp);
+      setLoading(false);
+    }
+
+    // Set up real-time listener for changes
+    const unsubscribe = setupRealtimeListener();
 
     const handleMouseMove = (e) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
@@ -44,12 +61,74 @@ const GlobalHistory = () => {
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
-  const fetchRecoveredItems = async () => {
+  const loadFromCache = () => {
     try {
-      setLoading(true);
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+
+      const data = JSON.parse(cached);
+      const now = Date.now();
+
+      // Check if cache is still valid
+      if (now - data.timestamp < CACHE_DURATION) {
+        return data;
+      }
+
+      // Cache expired, remove it
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    } catch (error) {
+      console.error("Error loading cache:", error);
+      return null;
+    }
+  };
+
+  const saveToCache = (items, stats) => {
+    try {
+      const data = {
+        items,
+        stats,
+        timestamp: Date.now(),
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+      setLastUpdated(data.timestamp);
+    } catch (error) {
+      console.error("Error saving to cache:", error);
+    }
+  };
+
+  const setupRealtimeListener = () => {
+    const matchesQuery = query(
+      collection(db, COLLECTIONS.MATCHES),
+      where("status", "==", "recovered"),
+      orderBy("recoveredAt", "desc"),
+      limit(100)
+    );
+
+    const unsubscribe = onSnapshot(
+      matchesQuery,
+      (snapshot) => {
+        // When data changes, fetch fresh data
+        fetchRecoveredItems(false);
+      },
+      (error) => {
+        console.error("Error in real-time listener:", error);
+      }
+    );
+
+    // Initial fetch
+    fetchRecoveredItems(true);
+
+    return unsubscribe;
+  };
+
+  const fetchRecoveredItems = async (showLoading = true) => {
+    try {
+      if (showLoading) setLoading(true);
 
       // Fetch recovered matches
       const matchesQuery = query(
@@ -102,8 +181,6 @@ const GlobalHistory = () => {
         });
       }
 
-      setRecoveredItems(matches);
-
       // Calculate stats
       const now = new Date();
       const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -123,16 +200,28 @@ const GlobalHistory = () => {
         return recoveredAt >= oneMonthAgo;
       }).length;
 
-      setStats({
+      const calculatedStats = {
         totalRecovered: matches.length,
         thisMonth,
         thisWeek,
-      });
+      };
+
+      setRecoveredItems(matches);
+      setStats(calculatedStats);
+
+      // Save to cache
+      saveToCache(matches, calculatedStats);
     } catch (error) {
       console.error("Error fetching recovered items:", error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchRecoveredItems(false);
   };
 
   const formatDate = (timestamp) => {
@@ -205,6 +294,25 @@ const GlobalHistory = () => {
             <p className="text-gray-400 text-lg">
               Celebrating successful reunions on VeriFind
             </p>
+            {lastUpdated && (
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <p className="text-xs text-gray-500">
+                  Last updated: {new Date(lastUpdated).toLocaleTimeString()}
+                </p>
+                <button
+                  onClick={handleRefresh}
+                  disabled={refreshing}
+                  className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/30 transition-all duration-300 disabled:opacity-50"
+                  title="Refresh data"
+                >
+                  <FiRefreshCw
+                    className={`w-4 h-4 text-cyan-400 ${
+                      refreshing ? "animate-spin" : ""
+                    }`}
+                  />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Stats Cards */}

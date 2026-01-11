@@ -333,7 +333,9 @@ function Home() {
 
       // Process heatmap data from actual Firestore data
       const processedHeatmapData = processHeatmapData(allLostItems);
-      setHeatmapData(processedHeatmapData);
+      if (processedHeatmapData.length > 0) {
+        setHeatmapData(processedHeatmapData);
+      }
 
       // Calculate statistics
       const today = new Date();
@@ -376,6 +378,14 @@ function Home() {
 
   // Process Firestore data into heatmap format
   const processHeatmapData = (lostItems) => {
+    // Check if Google Maps is loaded
+    if (!window.google || !window.google.maps) {
+      console.warn(
+        "Google Maps not loaded yet, skipping heatmap data processing"
+      );
+      return [];
+    }
+
     const locationCounts = {};
 
     // Mock data for demo - replace with actual coordinates from Firestore
@@ -397,13 +407,18 @@ function Home() {
     });
 
     // Convert to Google Maps heatmap data format
-    return Object.entries(locationCounts).map(([coord, weight]) => {
-      const [lat, lng] = coord.split(",").map(Number);
-      return {
-        location: new window.google.maps.LatLng(lat, lng),
-        weight: Math.min(weight, 10),
-      };
-    });
+    try {
+      return Object.entries(locationCounts).map(([coord, weight]) => {
+        const [lat, lng] = coord.split(",").map(Number);
+        return {
+          location: new window.google.maps.LatLng(lat, lng),
+          weight: Math.min(weight, 10),
+        };
+      });
+    } catch (error) {
+      console.error("Error creating heatmap data:", error);
+      return [];
+    }
   };
 
   // Calculate hotspots
@@ -453,6 +468,17 @@ function Home() {
 
     setHeatmap(newHeatmap);
   };
+
+  // Update heatmap when map is loaded and we have data
+  useEffect(() => {
+    if (map && window.google && heatmapData.length === 0) {
+      // Map is loaded but we don't have heatmap data yet, reload stats
+      loadCampusStats();
+    } else if (map && heatmapData.length > 0) {
+      // Both map and data are ready, update the heatmap
+      updateHeatmapLayer(heatmapData);
+    }
+  }, [map]);
 
   // Refresh data
   useEffect(() => {
