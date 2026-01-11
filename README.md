@@ -166,6 +166,30 @@ npm run preview
 - `npm run preview` - Preview production build
 - `firebase emulators:start` - Start Firebase local emulators
 - `firebase deploy --only functions` - Deploy Cloud Functions
+- `node helper/set-admin.js <email>` - Set a user as admin
+- `node helper/list-users.js` - List all users and their roles
+
+## Admin Setup
+
+VeriFind uses **database-based admin authentication** instead of hardcoded emails. See [ADMIN_SETUP.md](ADMIN_SETUP.md) for detailed instructions.
+
+### Quick Start
+
+1. **First user logs in** (creates account in Firestore)
+2. **Set user as admin** using helper script:
+   ```bash
+   node helper/set-admin.js your-email@gmail.com
+   ```
+3. **Access Admin Panel** at `/admin`
+
+### Admin Features
+
+- 👑 Full system access
+- 📊 Analytics dashboard
+- 👥 User management
+- ✅ Match approvals
+- ⚙️ Login access control
+- 📈 System settings
 
 ## Architecture
 

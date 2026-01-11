@@ -253,6 +253,20 @@ service cloud.firestore {
     }
     
     // ============================================
+    // 8️⃣ SYSTEM_SETTINGS (Platform Configuration)
+    // ============================================
+    match /systemSettings/{settingId} {
+      // Anyone authenticated can read system settings
+      allow read: if isAuthenticated();
+      
+      // Only admins can create/update system settings
+      allow create, update: if isAdmin();
+      
+      // No one can delete system settings
+      allow delete: if false;
+    }
+    
+    // ============================================
     // DENY ALL OTHER COLLECTIONS
     // ============================================
     match /{document=**} {

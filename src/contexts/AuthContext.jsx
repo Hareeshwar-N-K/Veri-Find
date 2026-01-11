@@ -19,44 +19,36 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Admin emails list - update with your admin emails
-  const adminEmails = [
-    "kavinvk26@gmail.com",
-    "admin@example.com",
-    "superuser@gmail.com",
-    "admin@gmail.com",
-    "verifindadmin@gmail.com",
-  ];
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
 
       if (user) {
         try {
-          // Check if user is admin
-          const isUserAdmin = adminEmails.includes(user.email);
-          setIsAdmin(isUserAdmin);
-          
-          // Store admin status in localStorage for quick access
-          if (isUserAdmin) {
-            localStorage.setItem('isAdmin', 'true');
-          } else {
-            localStorage.removeItem('isAdmin');
-          }
-
           // Create or update user in Firestore
           await createOrUpdateUser(user);
-          // Get full user profile
+
+          // Get full user profile from database
           const profile = await getUser(user.uid);
           setUserProfile(profile);
+
+          // Check if user is admin from database role
+          const isUserAdmin = profile?.role === "admin";
+          setIsAdmin(isUserAdmin);
+
+          // Store admin status in localStorage for quick access
+          if (isUserAdmin) {
+            localStorage.setItem("isAdmin", "true");
+          } else {
+            localStorage.removeItem("isAdmin");
+          }
         } catch (error) {
           console.error("Error syncing user profile:", error);
         }
       } else {
         setUserProfile(null);
         setIsAdmin(false);
-        localStorage.removeItem('isAdmin');
+        localStorage.removeItem("isAdmin");
       }
 
       setLoading(false);
@@ -70,7 +62,7 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
       setUserProfile(null);
       setIsAdmin(false);
-      localStorage.removeItem('isAdmin');
+      localStorage.removeItem("isAdmin");
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -80,12 +72,17 @@ export const AuthProvider = ({ children }) => {
     if (currentUser) {
       const profile = await getUser(currentUser.uid);
       setUserProfile(profile);
-    }
-  };
 
-  // Helper function to check if current user is admin
-  const checkIsAdmin = (email) => {
-    return adminEmails.includes(email);
+      // Update admin status from refreshed profile
+      const isUserAdmin = profile?.role === "admin";
+      setIsAdmin(isUserAdmin);
+
+      if (isUserAdmin) {
+        localStorage.setItem("isAdmin", "true");
+      } else {
+        localStorage.removeItem("isAdmin");
+      }
+    }
   };
 
   const value = {
@@ -96,12 +93,7 @@ export const AuthProvider = ({ children }) => {
     loading,
     logout,
     refreshProfile,
-    checkIsAdmin,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

@@ -4,22 +4,13 @@ import { signInWithPopup } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import { validateEmailForLogin, getLoginMode } from "../services/loginSettings";
+import { createOrUpdateUser, getUser } from "../services/firestore";
 
 function Login() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loginSettings, setLoginSettings] = useState(null);
   const navigate = useNavigate();
-
-  // Admin emails list - must match the one in AuthContext
-  const adminEmails = [
-    "kavinvk26@gmail.com",
-    "aishwaryaa5432@gmail.com",
-    "admin@example.com",
-    "superuser@gmail.com",
-    "admin@gmail.com",
-    "verifindadmin@gmail.com",
-  ];
 
   useEffect(() => {
     fetchLoginSettings();
@@ -41,11 +32,18 @@ function Login() {
       const user = result.user;
       console.log("Secure Login Success:", user.displayName);
 
+      // Create or update user in Firestore
+      await createOrUpdateUser(user);
+
+      // Get user profile from database to check role
+      const userProfile = await getUser(user.uid);
+      const isAdmin = userProfile?.role === "admin";
+
       // Check if user is admin (admins bypass all restrictions)
-      if (adminEmails.includes(user.email)) {
+      if (isAdmin) {
         toast.success("Welcome Admin! Redirecting to Admin Panel...", {
           duration: 3000,
-          icon: '👑',
+          icon: "👑",
         });
         setTimeout(() => {
           navigate("/admin");
@@ -55,7 +53,7 @@ function Login() {
 
       // Check login mode restrictions for non-admin users
       const validation = await validateEmailForLogin(user.email);
-      
+
       if (!validation.valid) {
         await auth.signOut(); // Sign out if not valid
         setError(validation.reason);
@@ -67,26 +65,26 @@ function Login() {
       // Valid user - proceed with normal flow
       toast.success("Login successful! Redirecting...", {
         duration: 3000,
-        icon: '✅',
+        icon: "✅",
       });
-      
+
       setTimeout(() => {
         navigate("/");
       }, 1500);
-
     } catch (err) {
       // 3. The Failure (Handle specific error codes for better UX)
       console.error("Login Failed:", err);
       let errorMessage = "Login failed. Please try again.";
-      
-      if (err.code === 'auth/popup-closed-by-user') {
+
+      if (err.code === "auth/popup-closed-by-user") {
         errorMessage = "Login popup was closed. Please try again.";
-      } else if (err.code === 'auth/cancelled-popup-request') {
+      } else if (err.code === "auth/cancelled-popup-request") {
         errorMessage = "Login request was cancelled.";
-      } else if (err.code === 'auth/popup-blocked') {
-        errorMessage = "Popup was blocked by your browser. Please allow popups for this site.";
+      } else if (err.code === "auth/popup-blocked") {
+        errorMessage =
+          "Popup was blocked by your browser. Please allow popups for this site.";
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -100,14 +98,20 @@ function Login() {
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         {/* Gradient Orbs */}
         <div className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{animationDelay: '1s'}}></div>
-        
+        <div
+          className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-pulse"
+          style={{ animationDelay: "1s" }}
+        ></div>
+
         {/* Grid Pattern */}
-        <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
                            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px'
-        }}></div>
+            backgroundSize: "50px 50px",
+          }}
+        ></div>
       </div>
 
       <div className="relative z-10 min-h-[calc(100vh-200px)] flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -123,7 +127,7 @@ function Login() {
               VeriFind
             </h1>
             <h2 className="text-4xl font-bold text-white mt-2">Welcome Back</h2>
-            
+
             {/* Login Mode Indicator */}
             {loginSettings && (
               <div className="mt-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
@@ -140,9 +144,9 @@ function Login() {
                 )}
               </div>
             )}
-            
+
             <p className="mt-2 text-slate-300">
-              {loginSettings?.mode === "organization" 
+              {loginSettings?.mode === "organization"
                 ? `Only @${loginSettings.domain} emails can login`
                 : "All Gmail accounts can login"}
             </p>
@@ -199,7 +203,9 @@ function Login() {
                     <FiMail className="w-4 h-4 text-green-400" />
                   </div>
                   <div>
-                    <h4 className="font-semibold text-green-400">Organization Access</h4>
+                    <h4 className="font-semibold text-green-400">
+                      Organization Access
+                    </h4>
                     <p className="text-xs text-green-300">
                       Only @{loginSettings.domain} emails can login
                     </p>
@@ -223,8 +229,13 @@ function Login() {
       {/* Add custom CSS for animations */}
       <style jsx>{`
         @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+          0%,
+          100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
         }
         .animate-gradient {
           background-size: 200% 200%;

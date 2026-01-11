@@ -63,7 +63,7 @@ const AdminPanel = () => {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("lost");
-  
+
   // Add new state for login mode
   const [loginMode, setLoginMode] = useState("any"); // 'any' or 'organization'
   const [organizationDomain, setOrganizationDomain] = useState("cit.edu.in");
@@ -98,7 +98,7 @@ const AdminPanel = () => {
 
   const checkAdminStatus = async () => {
     setCheckingAdmin(true);
-    
+
     if (!user) {
       toast.error("Please login to access admin panel");
       navigate("/login");
@@ -106,21 +106,9 @@ const AdminPanel = () => {
     }
 
     try {
-      const adminEmails = [
-        "kavinvk26@gmail.com",
-        "aishwaryaa5432@gmail.com",
-        "admin@example.com", 
-        "superuser@gmail.com",
-        "admin@gmail.com",
-        "verifindadmin@gmail.com",
-      ];
-
-      if (adminEmails.includes(user.email)) {
-        setIsAdmin(true);
-        return;
-      }
-
+      // Check user role from Firestore database
       const userDoc = await getDoc(doc(db, COLLECTIONS.USERS, user.uid));
+
       if (userDoc.exists() && userDoc.data().role === "admin") {
         setIsAdmin(true);
       } else {
@@ -138,7 +126,9 @@ const AdminPanel = () => {
 
   const fetchSystemSettings = async () => {
     try {
-      const settingsDoc = await getDoc(doc(db, COLLECTIONS.SYSTEM_SETTINGS, "loginMode"));
+      const settingsDoc = await getDoc(
+        doc(db, COLLECTIONS.SYSTEM_SETTINGS, "loginMode")
+      );
       if (settingsDoc.exists()) {
         const data = settingsDoc.data();
         setLoginMode(data.mode || "any");
@@ -170,7 +160,7 @@ const AdminPanel = () => {
   const toggleLoginMode = async () => {
     const newMode = loginMode === "any" ? "organization" : "any";
     setLoginMode(newMode);
-    
+
     // Auto-save when toggling
     setSavingSettings(true);
     try {
@@ -180,7 +170,11 @@ const AdminPanel = () => {
         updatedAt: new Date(),
         updatedBy: user.uid,
       });
-      toast.success(`Login mode set to: ${newMode === "any" ? "Any Gmail" : "Organization Only"}`);
+      toast.success(
+        `Login mode set to: ${
+          newMode === "any" ? "Any Gmail" : "Organization Only"
+        }`
+      );
     } catch (error) {
       console.error("Error saving login settings:", error);
       toast.error("Failed to save settings");
@@ -373,7 +367,9 @@ const AdminPanel = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-red-600 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-red-600 mb-4">
+            Access Denied
+          </h1>
           <p className="text-gray-600 mb-6">Admin privileges required</p>
           <Link
             to="/dashboard"
@@ -410,7 +406,9 @@ const AdminPanel = () => {
             <h1 className="text-3xl font-bold text-gray-900">
               Admin Dashboard
             </h1>
-            <p className="text-gray-600">Welcome back, {user?.displayName || "Admin"}</p>
+            <p className="text-gray-600">
+              Welcome back, {user?.displayName || "Admin"}
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
@@ -433,9 +431,11 @@ const AdminPanel = () => {
               <FiMail className="w-5 h-5 text-blue-600" />
               Login Access Control
             </h2>
-            <p className="text-sm text-gray-600 mt-1">Control who can access the platform</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Control who can access the platform
+            </p>
           </div>
-          
+
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Login Mode Toggle */}
@@ -443,7 +443,9 @@ const AdminPanel = () => {
                 <div className="flex items-center justify-between">
                   <div>
                     <h3 className="font-semibold text-gray-800">Login Mode</h3>
-                    <p className="text-sm text-gray-600">Set who can login to the platform</p>
+                    <p className="text-sm text-gray-600">
+                      Set who can login to the platform
+                    </p>
                   </div>
                   <button
                     onClick={toggleLoginMode}
@@ -453,18 +455,22 @@ const AdminPanel = () => {
                     <span className="sr-only">Toggle login mode</span>
                     <span
                       className={`${
-                        loginMode === "organization" ? 'translate-x-6 bg-green-600' : 'translate-x-1 bg-gray-400'
+                        loginMode === "organization"
+                          ? "translate-x-6 bg-green-600"
+                          : "translate-x-1 bg-gray-400"
                       } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
                     />
                     <div className="absolute inset-0 rounded-full bg-gray-200"></div>
                   </button>
                 </div>
 
-                <div className={`p-4 rounded-lg border ${
-                  loginMode === "organization" 
-                    ? "border-green-200 bg-green-50" 
-                    : "border-blue-200 bg-blue-50"
-                }`}>
+                <div
+                  className={`p-4 rounded-lg border ${
+                    loginMode === "organization"
+                      ? "border-green-200 bg-green-50"
+                      : "border-blue-200 bg-blue-50"
+                  }`}
+                >
                   <div className="flex items-center gap-3">
                     {loginMode === "organization" ? (
                       <>
@@ -472,7 +478,9 @@ const AdminPanel = () => {
                           <FiMail className="w-5 h-5 text-green-600" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-green-800">Organization Only</h4>
+                          <h4 className="font-semibold text-green-800">
+                            Organization Only
+                          </h4>
                           <p className="text-sm text-green-700">
                             Only @{organizationDomain} emails can login
                           </p>
@@ -484,7 +492,9 @@ const AdminPanel = () => {
                           <FiGlobe className="w-5 h-5 text-blue-600" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-blue-800">Any Gmail Account</h4>
+                          <h4 className="font-semibold text-blue-800">
+                            Any Gmail Account
+                          </h4>
                           <p className="text-sm text-blue-700">
                             All Gmail accounts can login
                           </p>
@@ -529,9 +539,7 @@ const AdminPanel = () => {
                       Saving...
                     </>
                   ) : (
-                    <>
-                      Save Settings
-                    </>
+                    <>Save Settings</>
                   )}
                 </button>
               </div>
@@ -541,17 +549,21 @@ const AdminPanel = () => {
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="p-4 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Current Status</span>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
-                    loginMode === "organization" 
-                      ? "bg-green-100 text-green-800" 
-                      : "bg-blue-100 text-blue-800"
-                  }`}>
+                  <span className="text-sm font-medium text-gray-700">
+                    Current Status
+                  </span>
+                  <span
+                    className={`px-2 py-1 text-xs rounded-full ${
+                      loginMode === "organization"
+                        ? "bg-green-100 text-green-800"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
                     {loginMode === "organization" ? "Restricted" : "Open"}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">
-                  {loginMode === "organization" 
+                  {loginMode === "organization"
                     ? `Only @${organizationDomain} emails can access the platform`
                     : "All Gmail accounts can access the platform"}
                 </p>
@@ -559,13 +571,17 @@ const AdminPanel = () => {
 
               <div className="p-4 rounded-lg border border-gray-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">Impact</span>
+                  <span className="text-sm font-medium text-gray-700">
+                    Impact
+                  </span>
                   <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-800">
-                    {loginMode === "organization" ? "Limited Access" : "Wide Access"}
+                    {loginMode === "organization"
+                      ? "Limited Access"
+                      : "Wide Access"}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">
-                  {loginMode === "organization" 
+                  {loginMode === "organization"
                     ? "Restricts platform to verified organizational members only"
                     : "Allows anyone with a Gmail account to use the platform"}
                 </p>

@@ -10,9 +10,10 @@ import { db, auth } from "../firebase/config";
 import { COLLECTIONS } from "./firestore";
 
 /**
- * Get current user role
+ * Get current user role from database
+ * @returns {Promise<string|null>} User role ('admin', 'moderator', 'user') or null
  */
-async function getCurrentUserRole() {
+export async function getCurrentUserRole() {
   const currentUser = auth.currentUser;
   if (!currentUser) return null;
 
