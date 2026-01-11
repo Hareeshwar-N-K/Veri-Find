@@ -722,7 +722,7 @@ export async function getUserNotifications(userId, limitCount = 10) {
 export async function createNotification(notificationData) {
   const notification = {
     ...notificationData,
-    read: false,
+    isRead: false,
     createdAt: serverTimestamp(),
   };
 
@@ -739,7 +739,7 @@ export async function createNotification(notificationData) {
 export async function markNotificationAsRead(notificationId) {
   const notificationRef = doc(db, COLLECTIONS.NOTIFICATIONS, notificationId);
   await updateDoc(notificationRef, {
-    read: true,
+    isRead: true,
     readAt: serverTimestamp(),
   });
 }
@@ -751,13 +751,13 @@ export async function markAllNotificationsAsRead(userId) {
   const q = query(
     collection(db, COLLECTIONS.NOTIFICATIONS),
     where("userId", "==", userId),
-    where("read", "==", false)
+    where("isRead", "==", false)
   );
 
   const snapshot = await getDocs(q);
   const updatePromises = snapshot.docs.map((doc) =>
     updateDoc(doc.ref, {
-      read: true,
+      isRead: true,
       readAt: serverTimestamp(),
     })
   );

@@ -134,7 +134,7 @@ function Navbar() {
   ];
 
   const handleNotificationClick = async (notification) => {
-    if (!notification.read) {
+    if (!notification.isRead) {
       await markNotificationAsRead(notification.id);
     }
     if (notification.link) {
@@ -161,7 +161,7 @@ function Navbar() {
     } ago`;
   };
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <>

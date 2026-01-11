@@ -529,7 +529,10 @@ const Profile = () => {
                       icon: <FiBell />,
                       count: myMatches.length,
                       color: "yellow",
-                      badge: stats.pending,
+                      badge:
+                        stats.pending > 0 && stats.pending < myMatches.length
+                          ? stats.pending
+                          : null,
                     },
                   ].map((tab) => (
                     <button
@@ -543,7 +546,7 @@ const Profile = () => {
                     >
                       {tab.icon}
                       {tab.label} ({tab.count})
-                      {tab.badge && tab.badge > 0 && (
+                      {tab.badge && (
                         <span className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center animate-pulse">
                           {tab.badge}
                         </span>

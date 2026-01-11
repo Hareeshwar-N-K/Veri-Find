@@ -3,6 +3,7 @@ import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "./contexts/AuthContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 // Pages
 import Home from "./pages/Home";
@@ -59,11 +60,46 @@ const App = () => {
               <Route path="/history" element={<GlobalHistory />} />
 
               {/* User Routes */}
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/report-lost" element={<ReportLost />} />
-              <Route path="/report-found" element={<ReportFound />} />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/settings"
+                element={
+                  <ProtectedRoute>
+                    <Settings />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/report-lost"
+                element={
+                  <ProtectedRoute>
+                    <ReportLost />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/report-found"
+                element={
+                  <ProtectedRoute>
+                    <ReportFound />
+                  </ProtectedRoute>
+                }
+              />
               <Route path="/item/:id" element={<ItemStatus />} />
               <Route path="/match/:id" element={<MatchDetails />} />
 

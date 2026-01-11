@@ -7,7 +7,7 @@ function Register() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  
+
   // Home page animations state
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
   const [isVisible, setIsVisible] = useState(false);
@@ -17,15 +17,15 @@ function Register() {
     const handleMouseMove = (e) => {
       setMousePosition({ x: e.clientX, y: e.clientY });
     };
-    
+
     const handleScroll = () => {
       setScrollY(window.scrollY);
     };
-    
+
     window.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("scroll", handleScroll);
     setIsVisible(true);
-    
+
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("scroll", handleScroll);
@@ -39,12 +39,11 @@ function Register() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
       console.log("Secure Sign Up Success:", user.displayName);
-      
+
       // Show success animation before redirect
       setTimeout(() => {
         navigate("/");
       }, 1000);
-      
     } catch (err) {
       console.error("Sign Up Failed:", err);
       setError("Sign up failed. Please try again.");
@@ -57,27 +56,34 @@ function Register() {
     <div className="relative overflow-hidden bg-gradient-to-br from-[#0A0F29] via-[#111827] to-[#1E1B4B] text-white min-h-screen">
       {/* Animated Background Elements - Same as Home */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div 
+        <div
           className="absolute top-1/4 left-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl animate-float"
           style={{
-            transform: `translateY(${Math.sin(scrollY * 0.003) * 20}px) rotate(${scrollY * 0.005}deg)`
+            transform: `translateY(${
+              Math.sin(scrollY * 0.003) * 20
+            }px) rotate(${scrollY * 0.005}deg)`,
           }}
         ></div>
-        <div 
+        <div
           className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-purple-500/10 rounded-full blur-3xl animate-float-reverse"
           style={{
-            animationDelay: '1s',
-            transform: `translateY(${Math.cos(scrollY * 0.002) * 20}px) rotate(${-scrollY * 0.005}deg)`
+            animationDelay: "1s",
+            transform: `translateY(${
+              Math.cos(scrollY * 0.002) * 20
+            }px) rotate(${-scrollY * 0.005}deg)`,
           }}
         ></div>
-        
-        <div className="absolute inset-0" style={{
-          backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
                            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
-          transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`
-        }}></div>
-        
+            backgroundSize: "50px 50px",
+            transform: `translate(${scrollY * 0.02}px, ${scrollY * 0.01}px)`,
+          }}
+        ></div>
+
         {[...Array(20)].map((_, i) => (
           <div
             key={i}
@@ -86,59 +92,91 @@ function Register() {
               left: `${Math.random() * 100}%`,
               top: `${Math.random() * 100}%`,
               animationDelay: `${Math.random() * 5}s`,
-              animationDuration: `${3 + Math.random() * 4}s`
+              animationDuration: `${3 + Math.random() * 4}s`,
             }}
           />
         ))}
-        
-        <div 
+
+        <div
           className="absolute w-[800px] h-[800px] bg-gradient-to-r from-cyan-500/5 to-purple-500/5 rounded-full blur-3xl transition-all duration-300 ease-out"
           style={{
-            transform: `translate(${mousePosition.x - 400}px, ${mousePosition.y - 400}px)`,
+            transform: `translate(${mousePosition.x - 400}px, ${
+              mousePosition.y - 400
+            }px)`,
           }}
         ></div>
-        
-        <svg className="absolute inset-0 w-full h-full" style={{opacity: 0.1}}>
+
+        <svg
+          className="absolute inset-0 w-full h-full"
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{ opacity: 0.1 }}
+        >
           <defs>
             <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style={{stopColor: '#22d3ee', stopOpacity: 1}} />
-              <stop offset="100%" style={{stopColor: '#a855f7', stopOpacity: 1}} />
+              <stop
+                offset="0%"
+                style={{ stopColor: "#22d3ee", stopOpacity: 1 }}
+              />
+              <stop
+                offset="100%"
+                style={{ stopColor: "#a855f7", stopOpacity: 1 }}
+              />
             </linearGradient>
           </defs>
           {[...Array(5)].map((_, i) => (
             <path
               key={i}
-              d={`M ${Math.random() * 100}% ${Math.random() * 100}% 
-                  C ${Math.random() * 100}% ${Math.random() * 100}%, 
-                    ${Math.random() * 100}% ${Math.random() * 100}%, 
-                    ${Math.random() * 100}% ${Math.random() * 100}%`}
+              d={`M ${Math.random() * 100} ${Math.random() * 100} 
+                  C ${Math.random() * 100} ${Math.random() * 100}, 
+                    ${Math.random() * 100} ${Math.random() * 100}, 
+                    ${Math.random() * 100} ${Math.random() * 100}`}
               stroke="url(#gradient)"
-              strokeWidth="1"
+              strokeWidth="0.5"
               fill="none"
               className="animate-draw"
-              style={{strokeDasharray: 1000, strokeDashoffset: 1000, animationDelay: `${i * 0.5}s`}}
+              style={{
+                strokeDasharray: 1000,
+                strokeDashoffset: 1000,
+                animationDelay: `${i * 0.5}s`,
+              }}
             />
           ))}
         </svg>
       </div>
 
-
       {/* Main Content */}
       <div className="relative z-10 pt-24 pb-20 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md mx-auto">
           {/* Animated Header */}
-          <div className={`text-center mb-10 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
+          <div
+            className={`text-center mb-10 transition-all duration-1000 ${
+              isVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-10"
+            }`}
+          >
             <div className="relative inline-block mb-8">
               <div className="w-24 h-24 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 flex items-center justify-center shadow-lg animate-float mx-auto">
                 <div className="w-16 h-16 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+                  <svg
+                    className="w-10 h-10 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"
+                    />
                   </svg>
                 </div>
                 <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500 to-green-600 rounded-full blur-xl opacity-30 animate-ping"></div>
               </div>
             </div>
-            
+
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               <span className="bg-gradient-to-r from-emerald-400 via-green-400 to-cyan-400 bg-clip-text text-transparent animate-gradient">
                 Join VeriFind
@@ -150,28 +188,42 @@ function Register() {
           </div>
 
           {/* Registration Card */}
-          <div className={`bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/10 transition-all duration-1000 ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`} style={{animationDelay: '0.2s'}}>
+          <div
+            className={`bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/10 transition-all duration-1000 ${
+              isVisible
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 translate-y-10"
+            }`}
+            style={{ animationDelay: "0.2s" }}
+          >
             {/* Benefits Section */}
             <div className="mb-8">
-              
               <div className="space-y-3">
                 <div className="flex items-start space-x-3">
                   <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <span className="text-emerald-400 font-bold text-sm">✓</span>
+                    <span className="text-emerald-400 font-bold text-sm">
+                      ✓
+                    </span>
                   </div>
-                  <p className="text-slate-300 text-sm">AI-powered item matching with 95% accuracy</p>
+                  <p className="text-slate-300 text-sm">
+                    AI-powered item matching with 95% accuracy
+                  </p>
                 </div>
                 <div className="flex items-start space-x-3">
                   <div className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-cyan-400 font-bold text-sm">✓</span>
                   </div>
-                  <p className="text-slate-300 text-sm">Secure verification to protect your items</p>
+                  <p className="text-slate-300 text-sm">
+                    Secure verification to protect your items
+                  </p>
                 </div>
                 <div className="flex items-start space-x-3">
                   <div className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
                     <span className="text-purple-400 font-bold text-sm">✓</span>
                   </div>
-                  <p className="text-slate-300 text-sm">Instant notifications when items are found</p>
+                  <p className="text-slate-300 text-sm">
+                    Instant notifications when items are found
+                  </p>
                 </div>
               </div>
             </div>
@@ -181,8 +233,18 @@ function Register() {
               <div className="mb-6 p-4 bg-gradient-to-r from-red-500/10 to-red-600/10 backdrop-blur-sm border border-red-500/30 rounded-xl animate-shake">
                 <div className="flex items-center">
                   <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mr-3">
-                    <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg
+                      className="w-4 h-4 text-red-400"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                      />
                     </svg>
                   </div>
                   <p className="text-sm text-red-300">{error}</p>
@@ -199,10 +261,10 @@ function Register() {
               >
                 {/* Background gradient on hover */}
                 <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-green-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                
+
                 {/* Shine effect */}
                 <div className="absolute -inset-x-24 -inset-y-8 bg-gradient-to-r from-transparent via-white/10 to-transparent -rotate-45 group-hover:translate-x-96 transition-transform duration-1000"></div>
-                
+
                 {/* Button Content */}
                 <div className="relative z-10 flex items-center">
                   {isLoading ? (
@@ -233,14 +295,18 @@ function Register() {
                         </svg>
                       </div>
                       <div className="text-left">
-                        <div className="text-lg font-semibold">Sign up with Google</div>
-                        <div className="text-xs text-slate-400">Fast, secure, and free</div>
+                        <div className="text-lg font-semibold">
+                          Sign up with Google
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Fast, secure, and free
+                        </div>
                       </div>
                     </>
                   )}
                 </div>
               </button>
-              
+
               {/* Border animation on hover */}
               <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl opacity-0 group-hover:opacity-30 blur-sm transition-opacity duration-300 pointer-events-none"></div>
             </div>
@@ -249,14 +315,34 @@ function Register() {
             <div className="mt-8 pt-6 border-t border-white/10">
               <div className="flex items-center justify-center space-x-4">
                 <div className="flex items-center text-slate-400">
-                  <svg className="w-4 h-4 mr-2 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <svg
+                    className="w-4 h-4 mr-2 text-emerald-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
                   </svg>
                   <span className="text-sm">Military-grade Security</span>
                 </div>
                 <div className="flex items-center text-slate-400">
-                  <svg className="w-4 h-4 mr-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  <svg
+                    className="w-4 h-4 mr-2 text-blue-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M13 10V3L4 14h7v7l9-11h-7z"
+                    />
                   </svg>
                   <span className="text-sm">Lightning Fast</span>
                 </div>
@@ -272,19 +358,31 @@ function Register() {
                 <div className="w-full border-t border-white/10"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm text-slate-400">Already have an account?</span>
+                <span className="px-4 bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-sm text-slate-400">
+                  Already have an account?
+                </span>
               </div>
             </div>
 
             {/* Login Link */}
             <div className="text-center">
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-gradient-to-r from-white/10 to-white/5 backdrop-blur-sm border border-white/20 hover:border-cyan-500/50 hover:from-cyan-500/10 hover:to-blue-500/10 text-white font-medium transition-all duration-300 group"
               >
                 <span>Sign In Instead</span>
-                <svg className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                <svg
+                  className="w-5 h-5 ml-2 transform group-hover:translate-x-1 transition-transform"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17 8l4 4m0 0l-4 4m4-4H3"
+                  />
                 </svg>
               </Link>
             </div>
@@ -296,11 +394,17 @@ function Register() {
               <div className="text-xl font-bold text-white">95%</div>
               <div className="text-xs text-slate-400">Success Rate</div>
             </div>
-            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-green-500/10 backdrop-blur-sm border border-white/10 animate-stat-pop" style={{animationDelay: '0.1s'}}>
+            <div
+              className="text-center p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-green-500/10 backdrop-blur-sm border border-white/10 animate-stat-pop"
+              style={{ animationDelay: "0.1s" }}
+            >
               <div className="text-xl font-bold text-white">10K+</div>
               <div className="text-xs text-slate-400">Users</div>
             </div>
-            <div className="text-center p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm border border-white/10 animate-stat-pop" style={{animationDelay: '0.2s'}}>
+            <div
+              className="text-center p-4 rounded-xl bg-gradient-to-br from-purple-500/10 to-pink-500/10 backdrop-blur-sm border border-white/10 animate-stat-pop"
+              style={{ animationDelay: "0.2s" }}
+            >
               <div className="text-xl font-bold text-white">2.5K+</div>
               <div className="text-xs text-slate-400">Items Found</div>
             </div>
@@ -309,9 +413,19 @@ function Register() {
           {/* Footer Text */}
           <p className="mt-8 text-center text-slate-400 text-sm">
             By signing up, you agree to our{" "}
-            <Link to="/terms" className="text-emerald-400 hover:text-emerald-300 transition-colors">Terms of Service</Link>{" "}
+            <Link
+              to="/terms"
+              className="text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Terms of Service
+            </Link>{" "}
             and{" "}
-            <Link to="/privacy" className="text-emerald-400 hover:text-emerald-300 transition-colors">Privacy Policy</Link>
+            <Link
+              to="/privacy"
+              className="text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              Privacy Policy
+            </Link>
           </p>
 
           {/* Loading Overlay */}
@@ -319,12 +433,26 @@ function Register() {
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
               <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm rounded-2xl p-8 max-w-md text-center animate-pop border border-white/20">
                 <div className="w-24 h-24 rounded-full bg-gradient-to-r from-emerald-500 to-green-600 flex items-center justify-center mx-auto mb-6 animate-bounce">
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  <svg
+                    className="w-12 h-12 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                    />
                   </svg>
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-3">Creating Your Account</h3>
-                <p className="text-slate-300 mb-6">Setting up your secure VeriFind profile...</p>
+                <h3 className="text-2xl font-bold text-white mb-3">
+                  Creating Your Account
+                </h3>
+                <p className="text-slate-300 mb-6">
+                  Setting up your secure VeriFind profile...
+                </p>
                 <div className="w-full bg-white/10 backdrop-blur-sm rounded-full h-2">
                   <div className="h-full bg-gradient-to-r from-emerald-500 to-green-600 rounded-full animate-pulse"></div>
                 </div>
@@ -346,24 +474,49 @@ function Register() {
       {/* Add custom CSS for animations */}
       <style jsx>{`
         @keyframes gradient {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
+          0%,
+          100% {
+            background-position: 0% 50%;
+          }
+          50% {
+            background-position: 100% 50%;
+          }
         }
         @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+          0%,
+          100% {
+            transform: translateY(0px);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
         }
         @keyframes float-reverse {
-          0%, 100% { transform: translateY(-20px); }
-          50% { transform: translateY(0px); }
+          0%,
+          100% {
+            transform: translateY(-20px);
+          }
+          50% {
+            transform: translateY(0px);
+          }
         }
         @keyframes particle {
-          0% { transform: translateY(0px) translateX(0px); opacity: 0; }
-          10% { opacity: 1; }
-          100% { transform: translateY(-100px) translateX(20px); opacity: 0; }
+          0% {
+            transform: translateY(0px) translateX(0px);
+            opacity: 0;
+          }
+          10% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(-100px) translateX(20px);
+            opacity: 0;
+          }
         }
         @keyframes draw {
-          to { stroke-dashoffset: 0; }
+          to {
+            stroke-dashoffset: 0;
+          }
         }
         @keyframes pop {
           0% {
@@ -379,32 +532,74 @@ function Register() {
           }
         }
         @keyframes ping-slow {
-          0% { transform: scale(1); opacity: 0.8; }
-          100% { transform: scale(1.5); opacity: 0; }
+          0% {
+            transform: scale(1);
+            opacity: 0.8;
+          }
+          100% {
+            transform: scale(1.5);
+            opacity: 0;
+          }
         }
         @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-          20%, 40%, 60%, 80% { transform: translateX(5px); }
+          0%,
+          100% {
+            transform: translateX(0);
+          }
+          10%,
+          30%,
+          50%,
+          70%,
+          90% {
+            transform: translateX(-5px);
+          }
+          20%,
+          40%,
+          60%,
+          80% {
+            transform: translateX(5px);
+          }
         }
         @keyframes stat-pop {
-          0% { transform: scale(0.8); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
+          0% {
+            transform: scale(0.8);
+            opacity: 0;
+          }
+          100% {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
-        
-        .animate-gradient { 
+
+        .animate-gradient {
           background-size: 200% 200%;
-          animation: gradient 3s ease infinite; 
+          animation: gradient 3s ease infinite;
         }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-        .animate-float-reverse { animation: float-reverse 8s ease-in-out infinite; }
-        .animate-particle { animation: particle linear infinite; }
-        .animate-draw { animation: draw 3s linear forwards; }
-        .animate-ping-slow { animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
-        .animate-pop { animation: pop 0.4s ease-out; }
-        .animate-shake { animation: shake 0.5s ease-in-out; }
-        .animate-stat-pop { animation: stat-pop 0.5s ease-out; }
-        
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        .animate-float-reverse {
+          animation: float-reverse 8s ease-in-out infinite;
+        }
+        .animate-particle {
+          animation: particle linear infinite;
+        }
+        .animate-draw {
+          animation: draw 3s linear forwards;
+        }
+        .animate-ping-slow {
+          animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+        }
+        .animate-pop {
+          animation: pop 0.4s ease-out;
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+        .animate-stat-pop {
+          animation: stat-pop 0.5s ease-out;
+        }
+
         /* Custom scrollbar */
         ::-webkit-scrollbar {
           width: 10px;
@@ -420,7 +615,7 @@ function Register() {
         ::-webkit-scrollbar-thumb:hover {
           background: linear-gradient(to bottom, #0ea5e9, #9333ea);
         }
-        
+
         /* Smooth scrolling */
         html {
           scroll-behavior: smooth;

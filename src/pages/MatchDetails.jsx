@@ -138,7 +138,14 @@ const MatchDetail = () => {
         toast.success("Match verified successfully!");
       } else {
         await updateMatchStatus(match.id, "rejected");
-        toast.info("Match rejected");
+        toast("Match rejected", {
+          icon: "ℹ️",
+          style: {
+            background: "#1e293b",
+            color: "#fff",
+            border: "1px solid rgba(255,255,255,0.1)",
+          },
+        });
       }
 
       fetchMatch();
