@@ -22,6 +22,7 @@ export const AuthProvider = ({ children }) => {
   // Admin emails list - update with your admin emails
   const adminEmails = [
     "kavinvk26@gmail.com",
+    "aishwaryaa5432@gmail.com",
     "admin@example.com",
     "superuser@gmail.com",
     "admin@gmail.com",
