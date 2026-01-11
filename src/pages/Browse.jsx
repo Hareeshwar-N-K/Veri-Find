@@ -298,7 +298,7 @@ const Browse = () => {
                 {item.reward && (
                   <div className="mb-4">
                     <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                      💰 ${item.reward} Reward
+                      💰 ₹{item.reward} Reward
                     </span>
                   </div>
                 )}

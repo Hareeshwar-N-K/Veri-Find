@@ -152,11 +152,13 @@ service cloud.firestore {
     // 4️⃣ MATCHES COLLECTION (Intelligence Layer)
     // ============================================
     match /matches/{matchId} {
-      // Only participants (owner/finder) and moderators can read
+      // Participants (owner/finder) and moderators can read all matches
+      // Anyone authenticated can read recovered matches (for Global History)
       allow read: if isAuthenticated()
         && (resource.data.ownerId == request.auth.uid 
             || resource.data.finderId == request.auth.uid 
-            || isModerator());
+            || isModerator()
+            || resource.data.status == 'recovered');
       
       // Allow authenticated users to create matches (client-side matching for free tier)
       // Validate that the creator is either the owner or finder

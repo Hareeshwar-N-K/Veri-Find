@@ -16,6 +16,7 @@ import {
   FiStar,
   FiZap,
   FiTrendingUp,
+  FiArchive,
 } from "react-icons/fi";
 import {
   FaRocket,
@@ -129,6 +130,7 @@ function Navbar() {
     { path: "/report-lost", label: "Report Lost", icon: FiSearch },
     { path: "/report-found", label: "Report Found", icon: FiPlusCircle },
     { path: "/dashboard", label: "Dashboard", icon: FiGrid },
+    { path: "/history", label: "History", icon: FiArchive },
   ];
 
   const handleNotificationClick = async (notification) => {

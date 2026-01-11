@@ -90,84 +90,93 @@ const Dashboard = () => {
   }, []);
 
   // Calculate stats from live data
-  const stats = useMemo(() => [
-    {
-      title: "Lost Items",
-      value: myLostItems.length,
-      subtitle: `${myLostItems.filter((i) => i.status === "searching").length} searching`,
-      icon: <FaExclamationTriangle />,
-      gradient: "from-red-500 to-pink-500",
-      iconGradient: "from-red-500 to-pink-600",
-    },
-    {
-      title: "Found Items",
-      value: myFoundItems.length,
-      subtitle: `${myFoundItems.filter((i) => i.status === "pending").length} pending`,
-      icon: <FaSearch />,
-      gradient: "from-green-500 to-emerald-500",
-      iconGradient: "from-green-500 to-emerald-600",
-    },
-    {
-      title: "Matches",
-      value: myMatches.length,
-      subtitle: `${myMatches.filter((i) => i.status === "pending_verification").length} pending`,
-      icon: <FaCheckCircle />,
-      gradient: "from-blue-500 to-cyan-500",
-      iconGradient: "from-blue-500 to-cyan-600",
-    },
-    {
-      title: "Recovered",
-      value: myMatches.filter((m) => m.status === "recovered").length,
-      subtitle: `$${recoveryStats.totalValueRecovered || 0} value`,
-      icon: <FaClock />,
-      gradient: "from-purple-500 to-violet-500",
-      iconGradient: "from-purple-500 to-violet-600",
-    },
-  ], [myLostItems, myFoundItems, myMatches, recoveryStats]);
+  const stats = useMemo(
+    () => [
+      {
+        title: "Lost Items",
+        value: myLostItems.length,
+        subtitle: `${
+          myLostItems.filter((i) => i.status === "searching").length
+        } searching`,
+        icon: <FaExclamationTriangle />,
+        gradient: "from-red-500 to-pink-500",
+        iconGradient: "from-red-500 to-pink-600",
+      },
+      {
+        title: "Found Items",
+        value: myFoundItems.length,
+        subtitle: `${
+          myFoundItems.filter((i) => i.status === "pending").length
+        } pending`,
+        icon: <FaSearch />,
+        gradient: "from-green-500 to-emerald-500",
+        iconGradient: "from-green-500 to-emerald-600",
+      },
+      {
+        title: "Matches",
+        value: myMatches.length,
+        subtitle: `${
+          myMatches.filter((i) => i.status === "pending_verification").length
+        } pending`,
+        icon: <FaCheckCircle />,
+        gradient: "from-blue-500 to-cyan-500",
+        iconGradient: "from-blue-500 to-cyan-600",
+      },
+      {
+        title: "Recovered",
+        value: myMatches.filter((m) => m.status === "recovered").length,
+        subtitle: `$${recoveryStats.totalValueRecovered || 0} value`,
+        icon: <FaClock />,
+        gradient: "from-purple-500 to-violet-500",
+        iconGradient: "from-purple-500 to-violet-600",
+      },
+    ],
+    [myLostItems, myFoundItems, myMatches, recoveryStats]
+  );
 
   const getStatusBadge = useCallback((status) => {
     const statusConfig = {
-      searching: { 
-        gradient: "from-yellow-500 to-orange-500", 
+      searching: {
+        gradient: "from-yellow-500 to-orange-500",
         text: "text-yellow-300",
         label: "Searching",
-        icon: "🔍"
+        icon: "🔍",
       },
-      pending: { 
-        gradient: "from-blue-500 to-cyan-500", 
+      pending: {
+        gradient: "from-blue-500 to-cyan-500",
         text: "text-blue-300",
         label: "Pending",
-        icon: "⏳"
+        icon: "⏳",
       },
-      matched: { 
-        gradient: "from-purple-500 to-pink-500", 
+      matched: {
+        gradient: "from-purple-500 to-pink-500",
         text: "text-purple-300",
         label: "Matched",
-        icon: "💫"
+        icon: "💫",
       },
       pending_verification: {
         gradient: "from-orange-500 to-red-500",
         text: "text-orange-300",
         label: "Verifying",
-        icon: "🔐"
+        icon: "🔐",
       },
-      verified: { 
-        gradient: "from-green-500 to-emerald-500", 
+      verified: {
+        gradient: "from-green-500 to-emerald-500",
         text: "text-green-300",
         label: "Verified",
-        icon: "✅"
+        icon: "✅",
       },
-      recovered: { 
-        gradient: "from-emerald-500 to-teal-500", 
+      recovered: {
+        gradient: "from-emerald-500 to-teal-500",
         text: "text-emerald-300",
         label: "Recovered",
-        icon: "🎉"
+        icon: "🎉",
       },
-      claimed: { 
-        gradient: "from-teal-500 to-cyan-500", 
+      claimed: {
+        gradient: "from-teal-500 to-cyan-500",
         text: "text-teal-300",
         label: "Claimed",
-        icon: "🏆"
+        icon: "🏆",
       },
     };
 
@@ -175,7 +184,7 @@ const Dashboard = () => {
       gradient: "from-gray-500 to-gray-700",
       text: "text-gray-300",
       label: status,
-      icon: "📋"
+      icon: "📋",
     };
 
     return (
@@ -194,7 +203,7 @@ const Dashboard = () => {
     const now = new Date();
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-    
+
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
@@ -238,7 +247,8 @@ const Dashboard = () => {
                 Dashboard
               </h1>
               <p className="text-gray-400">
-                Welcome back, {user?.displayName?.split(" ")[0]}! Here's your overview.
+                Welcome back, {user?.displayName?.split(" ")[0]}! Here's your
+                overview.
               </p>
             </div>
           </div>
@@ -262,9 +272,7 @@ const Dashboard = () => {
                   <p className="text-sm text-gray-300">{stat.subtitle}</p>
                 </div>
               </div>
-              <h3 className="text-lg font-semibold text-white">
-                {stat.title}
-              </h3>
+              <h3 className="text-lg font-semibold text-white">{stat.title}</h3>
             </div>
           ))}
         </div>
@@ -294,8 +302,8 @@ const Dashboard = () => {
                             {item.title}
                           </p>
                           <p className="text-sm text-yellow-200">
-                            {potentialMatches[item.id].length} potential match(es)
-                            found!
+                            {potentialMatches[item.id].length} potential
+                            match(es) found!
                           </p>
                         </div>
                         <Link
@@ -321,9 +329,7 @@ const Dashboard = () => {
 
           {/* Quick Actions */}
           <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-            <h3 className="text-xl font-bold text-white mb-6">
-              Quick Actions
-            </h3>
+            <h3 className="text-xl font-bold text-white mb-6">Quick Actions</h3>
             <div className="space-y-4">
               <Link
                 to="/report-lost"
@@ -334,10 +340,10 @@ const Dashboard = () => {
                     <FaExclamationTriangle className="text-white" />
                   </div>
                   <div>
-                    <p className="font-semibold text-white">
-                      Report Lost Item
+                    <p className="font-semibold text-white">Report Lost Item</p>
+                    <p className="text-sm text-gray-300">
+                      Can't find something?
                     </p>
-                    <p className="text-sm text-gray-300">Can't find something?</p>
                   </div>
                 </div>
                 <FaArrowRight className="text-gray-400 group-hover:text-red-400 group-hover:translate-x-1 transition-all" />
@@ -442,12 +448,13 @@ const Dashboard = () => {
                 </thead>
                 <tbody className="divide-y divide-white/10">
                   {displayItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                    <tr
+                      key={item.id}
+                      className="hover:bg-white/5 transition-colors"
+                    >
                       <td className="px-6 py-4">
                         <div>
-                          <p className="font-medium text-white">
-                            {item.title}
-                          </p>
+                          <p className="font-medium text-white">{item.title}</p>
                           <p className="text-sm text-gray-400 truncate max-w-xs">
                             {item.description}
                           </p>
@@ -458,7 +465,9 @@ const Dashboard = () => {
                           {item.category}
                         </span>
                       </td>
-                      <td className="px-6 py-4">{getStatusBadge(item.status)}</td>
+                      <td className="px-6 py-4">
+                        {getStatusBadge(item.status)}
+                      </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <FaCalendar className="text-cyan-400" />
@@ -570,8 +579,12 @@ const Dashboard = () => {
         <div className="mt-8 p-6 bg-gradient-to-r from-cyan-500/10 to-purple-500/10 rounded-2xl border border-cyan-500/30">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <div>
-              <h3 className="text-lg font-bold text-white">Keep your dashboard updated</h3>
-              <p className="text-gray-300">Refresh to see the latest matches and updates</p>
+              <h3 className="text-lg font-bold text-white">
+                Keep your dashboard updated
+              </h3>
+              <p className="text-gray-300">
+                Refresh to see the latest matches and updates
+              </p>
             </div>
             <button
               onClick={fetchDashboardData}
@@ -598,19 +611,28 @@ const Dashboard = () => {
       {/* Add minimal CSS for animations */}
       <style jsx>{`
         @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
         }
-        
+
         @keyframes pulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.5; }
+          0%,
+          100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
         }
-        
+
         .animate-spin {
           animation: spin 1s linear infinite;
         }
-        
+
         .animate-pulse {
           animation: pulse 2s ease-in-out infinite;
         }

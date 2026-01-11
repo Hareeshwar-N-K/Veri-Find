@@ -18,6 +18,7 @@ import Browse from "./pages/Browse";
 import AdminPanel from "./pages/AdminPanel";
 import NotFound from "./pages/NotFound";
 import AboutPage from "./pages/AboutPage";
+import GlobalHistory from "./pages/GlobalHistory";
 
 import "./App.css";
 import Settings from "./pages/Settings";
@@ -55,6 +56,7 @@ const App = () => {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/browse" element={<Browse />} />
+              <Route path="/history" element={<GlobalHistory />} />
 
               {/* User Routes */}
               <Route path="/dashboard" element={<Dashboard />} />

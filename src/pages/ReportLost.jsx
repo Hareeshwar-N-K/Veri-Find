@@ -44,6 +44,7 @@ const ReportLost = () => {
     reward: "",
     verificationQuestion: "",
     verificationAnswer: "",
+    customQuestion: "", // Add separate field for custom question
   });
 
   useEffect(() => {
@@ -101,6 +102,15 @@ const ReportLost = () => {
       return;
     }
 
+    // Validate custom question
+    if (
+      formData.verificationQuestion === "custom" &&
+      !formData.customQuestion.trim()
+    ) {
+      toast.error("Please enter your custom question");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -127,7 +137,10 @@ const ReportLost = () => {
           ? parseFloat(formData.estimatedValue)
           : null,
         reward: formData.reward ? parseFloat(formData.reward) : null,
-        verificationQuestion: formData.verificationQuestion,
+        verificationQuestion:
+          formData.verificationQuestion === "custom"
+            ? formData.customQuestion
+            : formData.verificationQuestion,
         verificationAnswer: formData.verificationAnswer,
         images,
         reportedBy: user.uid,
@@ -492,7 +505,7 @@ const ReportLost = () => {
                       <div className="group">
                         <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center">
                           <FiDollarSign className="w-4 h-4 mr-2 text-emerald-400" />
-                          Estimated Value ($)
+                          Estimated Value (₹)
                         </label>
                         <div className="relative">
                           <input
@@ -512,7 +525,7 @@ const ReportLost = () => {
                       <div className="group">
                         <label className="block text-sm font-semibold text-slate-300 mb-3 flex items-center">
                           <FiTag className="w-4 h-4 mr-2 text-amber-400" />
-                          Reward Offered ($)
+                          Reward Offered (₹)
                         </label>
                         <div className="relative">
                           <input
@@ -881,7 +894,8 @@ const ReportLost = () => {
                           <div className="relative">
                             <input
                               type="text"
-                              name="verificationQuestion"
+                              name="customQuestion"
+                              value={formData.customQuestion}
                               onChange={handleChange}
                               className="w-full px-4 py-4 bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-white transition-all duration-300 group-hover:shadow-lg placeholder-slate-400"
                               placeholder="Ask something only the owner would know..."
@@ -1012,6 +1026,8 @@ const ReportLost = () => {
                       disabled={
                         loading ||
                         !formData.verificationQuestion ||
+                        (formData.verificationQuestion === "custom" &&
+                          !formData.customQuestion.trim()) ||
                         !formData.verificationAnswer
                       }
                       className="relative px-8 py-4 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-xl hover:from-emerald-600 hover:to-green-700 transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center space-x-3 shadow-lg group overflow-hidden"

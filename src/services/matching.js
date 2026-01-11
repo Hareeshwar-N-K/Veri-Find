@@ -287,6 +287,9 @@ export async function createMatch(lostItem, foundItem, scoreData) {
       dateLost: lostItem.dateLost,
       currentStorageLocation: foundItem.currentStorageLocation,
       images: foundItem.images || [],
+      // Include owner's custom verification question
+      ownerVerificationQuestion: lostItem.verificationQuestion,
+      ownerVerificationAnswer: lostItem.verificationAnswer,
     });
 
     // Use all 3 questions for verification

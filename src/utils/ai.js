@@ -46,6 +46,8 @@ export async function generateVerificationQuestions(itemData) {
     dateLost = null,
     currentStorageLocation = "",
     images = [],
+    ownerVerificationQuestion = null,
+    ownerVerificationAnswer = null,
   } = itemData;
 
   const location =
@@ -157,6 +159,26 @@ CRITICAL: OPTION GENERATION RULES (ANTI-GUESSING):
    ✅ Features: "Leather strap", "Metal band", "Silicone band", "Nylon strap"
 
 4. RANDOMIZE correct answer position (0-3) - don't always put correct first!
+
+${
+  ownerVerificationQuestion && ownerVerificationAnswer
+    ? `
+═══════════════════════════════════════════════════════════════
+OWNER'S CUSTOM VERIFICATION QUESTION (MUST USE AS ONE QUESTION):
+═══════════════════════════════════════════════════════════════
+The item owner has provided a custom verification question. You MUST use this
+as ONE of your 3 questions. Generate 3 plausible wrong options.
+
+Owner's Question: "${ownerVerificationQuestion}"
+Correct Answer: "${ownerVerificationAnswer}"
+
+IMPORTANT: Create this as a multiple choice question with 4 options where:
+- One option is the correct answer (from owner)
+- Three options are plausible but incorrect alternatives
+- Randomize which position (0-3) the correct answer appears in
+`
+    : ""
+}
 
 ═══════════════════════════════════════════════════════════════
 CATEGORY-SPECIFIC GUIDANCE FOR: ${category.toUpperCase()}
