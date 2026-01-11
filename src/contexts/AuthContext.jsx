@@ -17,6 +17,16 @@ export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Admin emails list - update with your admin emails
+  const adminEmails = [
+    "kavinvk26@gmail.com",
+    "admin@example.com",
+    "superuser@gmail.com",
+    "admin@gmail.com",
+    "verifindadmin@gmail.com",
+  ];
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -24,6 +34,17 @@ export const AuthProvider = ({ children }) => {
 
       if (user) {
         try {
+          // Check if user is admin
+          const isUserAdmin = adminEmails.includes(user.email);
+          setIsAdmin(isUserAdmin);
+          
+          // Store admin status in localStorage for quick access
+          if (isUserAdmin) {
+            localStorage.setItem('isAdmin', 'true');
+          } else {
+            localStorage.removeItem('isAdmin');
+          }
+
           // Create or update user in Firestore
           await createOrUpdateUser(user);
           // Get full user profile
@@ -34,6 +55,8 @@ export const AuthProvider = ({ children }) => {
         }
       } else {
         setUserProfile(null);
+        setIsAdmin(false);
+        localStorage.removeItem('isAdmin');
       }
 
       setLoading(false);
@@ -46,6 +69,8 @@ export const AuthProvider = ({ children }) => {
     try {
       await signOut(auth);
       setUserProfile(null);
+      setIsAdmin(false);
+      localStorage.removeItem('isAdmin');
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -58,18 +83,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Helper function to check if current user is admin
+  const checkIsAdmin = (email) => {
+    return adminEmails.includes(email);
+  };
+
   const value = {
     currentUser,
     user: currentUser, // Alias for compatibility with new pages
     userProfile, // Full Firestore profile with stats, badges, etc.
+    isAdmin,
     loading,
     logout,
     refreshProfile,
+    checkIsAdmin,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };

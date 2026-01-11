@@ -40,6 +40,7 @@ export const COLLECTIONS = {
   RECOVERY_LEDGER: "recovery_ledger",
   AUDIT_LOGS: "audit_logs",
   CHAT_CHANNELS: "chat_channels",
+  SYSTEM_SETTINGS: "systemSettings", // Added this line
 };
 
 // ============================================
@@ -461,6 +462,55 @@ export async function getRecoveryStats() {
 }
 
 // ============================================
+// ⚙️ SYSTEM SETTINGS OPERATIONS
+// ============================================
+
+/**
+ * Get system settings
+ */
+export async function getSystemSettings() {
+  const settingsRef = doc(db, COLLECTIONS.SYSTEM_SETTINGS, "global");
+  const settingsSnap = await getDoc(settingsRef);
+
+  if (settingsSnap.exists()) {
+    return { id: settingsSnap.id, ...settingsSnap.data() };
+  }
+  
+  // Return default settings if not exists
+  return {
+    matchThreshold: 0.7,
+    aiScanEnabled: true,
+    autoMatchEnabled: true,
+    maintenanceMode: false,
+    siteTitle: "VeriFind",
+    siteDescription: "Lost and Found Platform",
+  };
+}
+
+/**
+ * Update system settings (admin only)
+ */
+export async function updateSystemSettings(settings) {
+  const settingsRef = doc(db, COLLECTIONS.SYSTEM_SETTINGS, "global");
+  const settingsSnap = await getDoc(settingsRef);
+
+  if (!settingsSnap.exists()) {
+    // Create with defaults
+    await setDoc(settingsRef, {
+      ...settings,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "system",
+    });
+  } else {
+    await updateDoc(settingsRef, {
+      ...settings,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "system",
+    });
+  }
+}
+
+// ============================================
 // 💬 CHAT OPERATIONS
 // ============================================
 
@@ -613,6 +663,8 @@ export async function getDashboardStats() {
 }
 
 export default {
+  // Collections
+  COLLECTIONS,
   // Users
   createOrUpdateUser,
   getUser,
@@ -638,6 +690,9 @@ export default {
   // Recovery
   getRecoveryStories,
   getRecoveryStats,
+  // System Settings
+  getSystemSettings,
+  updateSystemSettings,
   // Chat
   getMyChatChannels,
   getChatMessages,
