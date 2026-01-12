@@ -39,6 +39,7 @@ const COLLECTIONS = {
   RECOVERY_LEDGER: "recovery_ledger",
   AUDIT_LOGS: "audit_logs",
   CHAT_CHANNELS: "chat_channels",
+  NOTIFICATIONS: "notifications",
 };
 
 // ============================================
@@ -199,6 +200,120 @@ async function createAuditLog(action, userId, details) {
     });
   } catch (error) {
     logger.error("Failed to create audit log:", error);
+  }
+}
+
+/**
+ * Create in-app notification (FREE TIER COMPATIBLE)
+ */
+async function createNotification(userId, type, message, link, matchId = null) {
+  try {
+    await db.collection(COLLECTIONS.NOTIFICATIONS).add({
+      userId,
+      type,
+      message,
+      link,
+      matchId,
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    logger.info(`Notification created for user ${userId}`);
+  } catch (error) {
+    logger.error("Failed to create notification:", error);
+  }
+}
+
+/**
+ * Create detailed notification with email-like content stored in Firestore
+ * This stores rich notification content that users can view in-app
+ * FREE TIER COMPATIBLE - No external API calls
+ */
+async function createDetailedNotification(
+  userId,
+  type,
+  message,
+  link,
+  details,
+  matchId = null
+) {
+  try {
+    await db.collection(COLLECTIONS.NOTIFICATIONS).add({
+      userId,
+      type,
+      message,
+      link,
+      matchId,
+      details, // Rich content with match details, similar to email
+      isRead: false,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    logger.info(`Detailed notification created for user ${userId}`);
+  } catch (error) {
+    logger.error("Failed to create detailed notification:", error);
+  }
+}
+
+/**
+ * Send match notifications (IN-APP ONLY - FREE TIER COMPATIBLE)
+ * Creates rich in-app notifications with detailed match information
+ */
+async function sendMatchNotifications(match, ownerData, finderData) {
+  const matchId = match.id || match.matchId;
+
+  // Create in-app notifications with detailed content
+  try {
+    // Notification for owner with details
+    if (ownerData.notificationsEnabled !== false) {
+      const ownerDetails = {
+        title: `Match Found for Your ${match.itemCategory}`,
+        aiScore: Math.round(match.aiScore * 100),
+        foundLocation: match.foundLocation?.name || "Not specified",
+        foundDate: match.foundDate
+          ? new Date(
+              match.foundDate.toDate
+                ? match.foundDate.toDate()
+                : match.foundDate
+            ).toLocaleDateString()
+          : "Not specified",
+        action: "Please verify ownership by answering security questions",
+      };
+
+      await createDetailedNotification(
+        match.ownerId,
+        "match_found",
+        `🎯 Potential match found for your ${match.itemCategory}: "${match.lostItemTitle}"`,
+        `/match/${matchId}`,
+        ownerDetails,
+        matchId
+      );
+    }
+
+    // Notification for finder with details
+    if (finderData.notificationsEnabled !== false) {
+      const finderDetails = {
+        title: `Your Found ${match.itemCategory} Has Been Matched`,
+        aiScore: Math.round(match.aiScore * 100),
+        lostLocation: match.lostLocation?.name || "Not specified",
+        lostDate: match.lostDate
+          ? new Date(
+              match.lostDate.toDate ? match.lostDate.toDate() : match.lostDate
+            ).toLocaleDateString()
+          : "Not specified",
+        action:
+          "The owner will verify ownership. You'll earn reputation points after successful return!",
+      };
+
+      await createDetailedNotification(
+        match.finderId,
+        "match_created",
+        `✨ Your found ${match.itemCategory} matched with a lost item report`,
+        `/match/${matchId}`,
+        finderDetails,
+        matchId
+      );
+    }
+  } catch (error) {
+    logger.error("Failed to create in-app notifications:", error);
   }
 }
 
@@ -426,6 +541,56 @@ async function createMatchDocument(matchData) {
     matchId: matchRef.id,
     score: matchData.score.overall,
   });
+
+  // Fetch user data for notifications
+  try {
+    const ownerDoc = await db
+      .collection(COLLECTIONS.USERS)
+      .doc(matchData.ownerId)
+      .get();
+    const finderDoc = await db
+      .collection(COLLECTIONS.USERS)
+      .doc(matchData.finderId)
+      .get();
+
+    const ownerData = ownerDoc.data() || {};
+    const finderData = finderDoc.data() || {};
+
+    // Get item details
+    const lostItemDoc = await db
+      .collection(COLLECTIONS.LOST_ITEMS)
+      .doc(matchData.lostItemId)
+      .get();
+    const foundItemDoc = await db
+      .collection(COLLECTIONS.FOUND_ITEMS)
+      .doc(matchData.foundItemId)
+      .get();
+
+    const lostItem = lostItemDoc.data() || {};
+    const foundItem = foundItemDoc.data() || {};
+
+    // Prepare match data for notifications
+    const matchForNotification = {
+      id: matchRef.id,
+      matchId: matchRef.id,
+      ownerId: matchData.ownerId,
+      finderId: matchData.finderId,
+      aiScore: matchData.score.overall,
+      itemCategory: foundItem.category || lostItem.category || "item",
+      lostItemTitle: lostItem.title || "your item",
+      foundItemTitle: foundItem.title || "found item",
+      lostLocation: lostItem.locationLost,
+      foundLocation: foundItem.locationFound,
+      lostDate: lostItem.dateLost,
+      foundDate: foundItem.dateFound,
+    };
+
+    // Send notifications (both in-app and email)
+    await sendMatchNotifications(matchForNotification, ownerData, finderData);
+  } catch (notifError) {
+    logger.error("Failed to send match notifications:", notifError);
+    // Don't fail the whole operation if notifications fail
+  }
 }
 
 // ============================================

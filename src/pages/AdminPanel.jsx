@@ -314,14 +314,22 @@ const AdminPanel = () => {
       {
         data: Object.values(categoryStats).map((val) => Number(val) || 0),
         backgroundColor: [
-          "rgba(59, 130, 246, 0.8)",
-          "rgba(16, 185, 129, 0.8)",
-          "rgba(245, 158, 11, 0.8)",
-          "rgba(139, 92, 246, 0.8)",
-          "rgba(236, 72, 153, 0.8)",
-          "rgba(156, 163, 175, 0.8)",
+          "rgba(59, 130, 246, 0.85)",
+          "rgba(16, 185, 129, 0.85)",
+          "rgba(245, 158, 11, 0.85)",
+          "rgba(139, 92, 246, 0.85)",
+          "rgba(236, 72, 153, 0.85)",
+          "rgba(156, 163, 175, 0.85)",
         ],
-        borderWidth: 1,
+        borderColor: [
+          "rgb(59, 130, 246)",
+          "rgb(16, 185, 129)",
+          "rgb(245, 158, 11)",
+          "rgb(139, 92, 246)",
+          "rgb(236, 72, 153)",
+          "rgb(156, 163, 175)",
+        ],
+        borderWidth: 2,
       },
     ],
   };
@@ -333,14 +341,26 @@ const AdminPanel = () => {
       legend: {
         position: "bottom",
         labels: {
-          color: "#e5e7eb",
+          color: "#1f2937", // Dark gray for visibility on white background
+          font: {
+            size: 12,
+            weight: "500",
+          },
+          padding: 15,
         },
       },
       tooltip: {
+        backgroundColor: "rgba(17, 24, 39, 0.95)",
+        titleColor: "#f3f4f6",
+        bodyColor: "#e5e7eb",
+        borderColor: "#6366f1",
+        borderWidth: 1,
+        padding: 12,
+        displayColors: true,
         callbacks: {
           label: function (context) {
             const label = context.label || "";
-            const value = context.parsed || 0;
+            const value = context.parsed || context.parsed.y || 0;
             return label + ": " + value;
           },
         },
@@ -349,18 +369,28 @@ const AdminPanel = () => {
     scales: {
       x: {
         ticks: {
-          color: "#9ca3af",
+          color: "#374151", // Darker for better visibility
+          font: {
+            size: 11,
+            weight: "500",
+          },
         },
         grid: {
-          color: "rgba(255, 255, 255, 0.1)",
+          color: "rgba(156, 163, 175, 0.2)",
+          drawBorder: false,
         },
       },
       y: {
         ticks: {
-          color: "#9ca3af",
+          color: "#374151", // Darker for better visibility
+          font: {
+            size: 11,
+            weight: "500",
+          },
         },
         grid: {
-          color: "rgba(255, 255, 255, 0.1)",
+          color: "rgba(156, 163, 175, 0.2)",
+          drawBorder: false,
         },
       },
     },
@@ -418,17 +448,17 @@ const AdminPanel = () => {
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
           <LoadingSpinner size="lg" />
-        </div>
-      </div>
-    );
-  }
-
-  const filteredItems = getFilteredItems();
-
-  return (
-    <div className="flex min-h-screen bg-gray-50">
+        </div>dient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
       <AdminSidebar />
 
+      <div className="flex-1 p-8 overflow-auto">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Admin Dashboard
+            </h1>
+            <p className="text-gray-700 font-medium
       <div className="flex-1 p-8 overflow-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -455,13 +485,13 @@ const AdminPanel = () => {
         </div>
 
         {/* System Settings Card - NEW */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
-            <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-3">
-              <FiMail className="w-5 h-5 text-blue-600" />
+        <div className="bg-white rounded-xl shadow-lg border border-blue-200 mb-8 overflow-hidden">
+          <div className="px-6 py-4 border-b border-blue-200 bg-gradient-to-r from-blue-100 to-indigo-100">
+            <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
+              <FiMail className="w-5 h-5 text-blue-700" />
               Login Access Control
             </h2>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-700 font-medium mt-1">
               Control who can access the platform
             </p>
           </div>
@@ -472,8 +502,8 @@ const AdminPanel = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-semibold text-gray-800">Login Mode</h3>
-                    <p className="text-sm text-gray-600">
+                    <h3 className="font-bold text-gray-900">Login Mode</h3>
+                    <p className="text-sm text-gray-700 font-medium">
                       Set who can login to the platform
                     </p>
                   </div>
@@ -495,37 +525,37 @@ const AdminPanel = () => {
                 </div>
 
                 <div
-                  className={`p-4 rounded-lg border ${
+                  className={`p-4 rounded-lg border-2 ${
                     loginMode === "organization"
-                      ? "border-green-200 bg-green-50"
-                      : "border-blue-200 bg-blue-50"
+                      ? "border-green-300 bg-green-50"
+                      : "border-blue-300 bg-blue-50"
                   }`}
                 >
                   <div className="flex items-center gap-3">
                     {loginMode === "organization" ? (
                       <>
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                          <FiMail className="w-5 h-5 text-green-600" />
+                        <div className="w-10 h-10 rounded-full bg-green-200 flex items-center justify-center">
+                          <FiMail className="w-5 h-5 text-green-700" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-green-800">
+                          <h4 className="font-bold text-green-900">
                             Organization Only
                           </h4>
-                          <p className="text-sm text-green-700">
+                          <p className="text-sm text-green-800 font-medium">
                             Only @{organizationDomain} emails can login
                           </p>
                         </div>
                       </>
                     ) : (
                       <>
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                          <FiGlobe className="w-5 h-5 text-blue-600" />
+                        <div className="w-10 h-10 rounded-full bg-blue-200 flex items-center justify-center">
+                          <FiGlobe className="w-5 h-5 text-blue-700" />
                         </div>
                         <div>
-                          <h4 className="font-semibold text-blue-800">
+                          <h4 className="font-bold text-blue-900">
                             Any Gmail Account
                           </h4>
-                          <p className="text-sm text-blue-700">
+                          <p className="text-sm text-blue-800 font-medium">
                             All Gmail accounts can login
                           </p>
                         </div>
@@ -538,22 +568,22 @@ const AdminPanel = () => {
               {/* Organization Domain Settings */}
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <label className="block text-sm font-bold text-gray-900 mb-2">
                     Organization Domain
                   </label>
                   <div className="flex gap-2">
-                    <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500">
+                    <span className="inline-flex items-center px-3 py-2 rounded-l-md border border-r-0 border-gray-400 bg-gray-100 text-gray-700 font-semibold">
                       @
                     </span>
                     <input
                       type="text"
                       value={organizationDomain}
                       onChange={(e) => setOrganizationDomain(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="flex-1 px-3 py-2 border border-gray-400 rounded-r-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-gray-900 font-medium"
                       placeholder="cit.edu.in"
                     />
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p className="text-xs text-gray-700 font-medium mt-2">
                     Set the domain for organization emails (e.g., cit.edu.in)
                   </p>
                 </div>
@@ -651,26 +681,26 @@ const AdminPanel = () => {
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-blue-200">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Items Status</h2>
-              <FiBarChart2 className="w-6 h-6 text-gray-400" />
+              <h2 className="text-xl font-bold text-gray-900">Items Status</h2>
+              <FiBarChart2 className="w-6 h-6 text-blue-600" />
             </div>
             <div className="h-64">
               <Bar data={barChartData} options={chartOptions} />
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
+          <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-purple-200">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold">Items by Category</h2>
-              <FiBarChart2 className="w-6 h-6 text-gray-400" />
+              <h2 className="text-xl font-bold text-gray-900">Items by Category</h2>
+              <FiBarChart2 className="w-6 h-6 text-purple-600" />
             </div>
             <div className="h-64">
               {Object.keys(categoryStats).length > 0 ? (
                 <Pie data={pieChartData} options={chartOptions} />
               ) : (
-                <div className="h-full flex items-center justify-center text-gray-500">
+                <div className="h-full flex items-center justify-center text-gray-700 font-semibold">
                   No data available
                 </div>
               )}
@@ -679,37 +709,37 @@ const AdminPanel = () => {
         </div>
 
         {/* Items Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden">
           {/* Tabs and Search */}
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-6 py-4 border-b-2 border-gray-200 bg-gray-50">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setActiveTab("lost")}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-bold transition-colors ${
                     activeTab === "lost"
-                      ? "bg-red-100 text-red-600"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-red-200 text-red-900 shadow-md"
+                      : "text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Lost Items ({lostItems.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("found")}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-bold transition-colors ${
                     activeTab === "found"
-                      ? "bg-green-100 text-green-600"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-green-200 text-green-900 shadow-md"
+                      : "text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Found Items ({foundItems.length})
                 </button>
                 <button
                   onClick={() => setActiveTab("matches")}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  className={`px-4 py-2 rounded-lg font-bold transition-colors ${
                     activeTab === "matches"
-                      ? "bg-blue-100 text-blue-600"
-                      : "text-gray-600 hover:bg-gray-100"
+                      ? "bg-blue-200 text-blue-900 shadow-md"
+                      : "text-gray-700 hover:bg-gray-200"
                   }`}
                 >
                   Matches ({matches.length})
@@ -717,13 +747,13 @@ const AdminPanel = () => {
               </div>
 
               <div className="relative">
-                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-600" />
                 <input
                   type="text"
                   placeholder="Search items..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none w-full md:w-64"
+                  className="pl-10 pr-4 py-2 border-2 border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-full md:w-64 text-gray-900 font-medium placeholder-gray-500"
                 />
               </div>
             </div>
@@ -731,25 +761,25 @@ const AdminPanel = () => {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y-2 divide-gray-300">
+              <thead className="bg-gradient-to-r from-gray-100 to-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     {activeTab === "matches" ? "Match Details" : "Item"}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     {activeTab === "matches" ? "Score" : "Location"}
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -757,28 +787,28 @@ const AdminPanel = () => {
               <tbody className="divide-y divide-gray-200">
                 {filteredItems.length > 0 ? (
                   filteredItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
+                    <tr key={item.id} className="hover:bg-blue-50/50">
                       <td className="px-6 py-4">
                         <div>
-                          <div className="font-medium text-gray-900">
+                          <div className="font-bold text-gray-900">
                             {item.title ||
                               item.itemTitle ||
                               "Match #" + item.id.slice(0, 6)}
                           </div>
-                          <div className="text-sm text-gray-500 truncate max-w-xs">
+                          <div className="text-sm text-gray-700 font-medium truncate max-w-xs">
                             {item.description ||
                               `Owner: ${item.ownerName || "Unknown"}`}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800 capitalize">
+                        <span className="px-3 py-1 text-xs font-bold rounded-full bg-gray-200 text-gray-900 capitalize">
                           {item.category || item.itemCategory || "N/A"}
                         </span>
                       </td>
                       <td className="px-6 py-4">
                         <span
-                          className={`px-2 py-1 text-xs rounded-full ${
+                          className={`px-3 py-1 text-xs font-bold rounded-full ${
                             item.status === "searching"
                               ? "bg-yellow-100 text-yellow-800"
                               : item.status === "pending"
@@ -840,7 +870,7 @@ const AdminPanel = () => {
                   <tr>
                     <td
                       colSpan="6"
-                      className="px-6 py-12 text-center text-gray-500"
+                      className="px-6 py-12 text-center text-gray-700 font-semibold"
                     >
                       No {activeTab} items found
                     </td>
@@ -853,8 +883,8 @@ const AdminPanel = () => {
 
         {/* Quick Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <h3 className="font-semibold mb-4">System Status</h3>
+          <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-green-200">
+            <h3 className="font-bold text-gray-900 mb-4 text-lg">System Status</h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Firebase</span>

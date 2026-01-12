@@ -20,7 +20,6 @@ const Settings = () => {
   const [saving, setSaving] = useState(false);
   const [settings, setSettings] = useState({
     notificationsEnabled: true,
-    emailNotificationsEnabled: true,
   });
   const [scrollY, setScrollY] = useState(0);
 
@@ -44,7 +43,6 @@ const Settings = () => {
         const userData = userDoc.data();
         setSettings({
           notificationsEnabled: userData.notificationsEnabled ?? true,
-          emailNotificationsEnabled: userData.emailNotificationsEnabled ?? true,
         });
       }
     } catch (error) {
@@ -69,7 +67,6 @@ const Settings = () => {
       setSaving(true);
       await updateDoc(doc(db, "users", user.uid), {
         notificationsEnabled: settings.notificationsEnabled,
-        emailNotificationsEnabled: settings.emailNotificationsEnabled,
         updatedAt: new Date(),
       });
       toast.success("Settings saved successfully!");
@@ -173,8 +170,8 @@ const Settings = () => {
                 </button>
               </div>
 
-              {/* Email Notifications Toggle */}
-              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 hover:border-purple-500/30 transition-all">
+              {/* Email Notifications Toggle - Requires Blaze Plan */}
+              <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10 opacity-60">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 flex items-center justify-center">
                     <FiMail className="w-5 h-5 text-purple-400" />
@@ -184,28 +181,18 @@ const Settings = () => {
                       Email Notifications
                     </p>
                     <p className="text-sm text-gray-400">
-                      Receive match alerts via email
-                      <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs rounded-full border border-yellow-500/30">
-                        Coming Soon
+                      Requires Firebase Blaze Plan
+                      <span className="ml-2 px-2 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded-full border border-gray-500/30">
+                        Not Available
                       </span>
                     </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => handleToggle("emailNotificationsEnabled")}
-                  className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
-                    settings.emailNotificationsEnabled
-                      ? "bg-gradient-to-r from-purple-500 to-pink-500"
-                      : "bg-gray-600"
-                  }`}
+                  disabled
+                  className="relative inline-flex h-7 w-14 items-center rounded-full bg-gray-600 opacity-50 cursor-not-allowed"
                 >
-                  <span
-                    className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
-                      settings.emailNotificationsEnabled
-                        ? "translate-x-8"
-                        : "translate-x-1"
-                    }`}
-                  />
+                  <span className="inline-block h-5 w-5 transform rounded-full bg-white translate-x-1" />
                 </button>
               </div>
             </div>
