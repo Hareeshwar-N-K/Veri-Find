@@ -448,7 +448,16 @@ const AdminPanel = () => {
         <AdminSidebar />
         <div className="flex-1 flex items-center justify-center">
           <LoadingSpinner size="lg" />
-        </div>dient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
+        </div>
+      </div>
+    );
+  }
+
+  // Get filtered items for table display
+  const filteredItems = getFilteredItems();
+
+  return (
+    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/20">
       <AdminSidebar />
 
       <div className="flex-1 p-8 overflow-auto">
@@ -458,15 +467,7 @@ const AdminPanel = () => {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Admin Dashboard
             </h1>
-            <p className="text-gray-700 font-medium
-      <div className="flex-1 p-8 overflow-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              Admin Dashboard
-            </h1>
-            <p className="text-gray-600">
+            <p className="text-gray-700 font-medium">
               Welcome back, {user?.displayName || "Admin"}
             </p>
           </div>
@@ -510,17 +511,20 @@ const AdminPanel = () => {
                   <button
                     onClick={toggleLoginMode}
                     disabled={savingSettings}
-                    className="relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+                    className={`relative inline-flex items-center h-6 rounded-full w-11 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 ${
+                      loginMode === "organization"
+                        ? "bg-green-600"
+                        : "bg-blue-600"
+                    }`}
                   >
                     <span className="sr-only">Toggle login mode</span>
                     <span
                       className={`${
                         loginMode === "organization"
-                          ? "translate-x-6 bg-green-600"
-                          : "translate-x-1 bg-gray-400"
-                      } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                          ? "translate-x-6"
+                          : "translate-x-1"
+                      } inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform`}
                     />
-                    <div className="absolute inset-0 rounded-full bg-gray-200"></div>
                   </button>
                 </div>
 
@@ -659,20 +663,20 @@ const AdminPanel = () => {
             color="red"
           />
           <StatsCard
-            icon={FiPackage}
+            icon={<FiPackage className="w-6 h-6" />}
             title="Found Items"
             value={stats.foundItems}
             color="green"
           />
           <StatsCard
-            icon={FiCheckCircle}
+            icon={<FiCheckCircle className="w-6 h-6" />}
             title="Matches"
             value={stats.totalMatches}
             subtitle={`${stats.pendingVerifications} pending`}
             color="blue"
           />
           <StatsCard
-            icon={FiUsers}
+            icon={<FiUsers className="w-6 h-6" />}
             title="Total Users"
             value={stats.totalUsers}
             color="purple"
@@ -693,7 +697,9 @@ const AdminPanel = () => {
 
           <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-purple-200">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Items by Category</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                Items by Category
+              </h2>
               <FiBarChart2 className="w-6 h-6 text-purple-600" />
             </div>
             <div className="h-64">
@@ -884,7 +890,9 @@ const AdminPanel = () => {
         {/* Quick Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-green-200">
-            <h3 className="font-bold text-gray-900 mb-4 text-lg">System Status</h3>
+            <h3 className="font-bold text-gray-900 mb-4 text-lg">
+              System Status
+            </h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-gray-600">Firebase</span>
@@ -907,34 +915,44 @@ const AdminPanel = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <h3 className="font-semibold mb-4">Pending Actions</h3>
+          <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-orange-200">
+            <h3 className="font-bold text-gray-900 mb-4 text-lg">
+              Pending Actions
+            </h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Verifications</span>
-                <span className="font-medium text-orange-600">
+                <span className="text-gray-800 font-semibold">
+                  Verifications
+                </span>
+                <span className="font-bold text-orange-700 text-lg">
                   {stats.pendingVerifications}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Active Searches</span>
-                <span className="font-medium">
+                <span className="text-gray-800 font-semibold">
+                  Active Searches
+                </span>
+                <span className="font-bold text-gray-900 text-lg">
                   {lostItems.filter((i) => i.status === "searching").length}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-600">Pending Claims</span>
-                <span className="font-medium">
+                <span className="text-gray-800 font-semibold">
+                  Pending Claims
+                </span>
+                <span className="font-bold text-gray-900 text-lg">
                   {foundItems.filter((i) => i.status === "pending").length}
                 </span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100">
-            <h3 className="font-semibold mb-4">Success Rate</h3>
+          <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-blue-200">
+            <h3 className="font-bold text-gray-900 mb-4 text-lg">
+              Success Rate
+            </h3>
             <div className="text-center">
-              <div className="text-4xl font-bold text-green-600">
+              <div className="text-5xl font-bold text-green-700">
                 {stats.totalMatches > 0
                   ? Math.round(
                       (stats.recoveredItems / stats.totalMatches) * 100
@@ -942,7 +960,7 @@ const AdminPanel = () => {
                   : 0}
                 %
               </div>
-              <p className="text-sm text-gray-600 mt-2">
+              <p className="text-sm text-gray-800 font-semibold mt-2">
                 {stats.recoveredItems} of {stats.totalMatches} matches recovered
               </p>
             </div>

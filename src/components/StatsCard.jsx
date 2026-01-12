@@ -1,19 +1,19 @@
 import React, { useState } from "react";
-import { 
-  FiTrendingUp, 
-  FiTrendingDown, 
+import {
+  FiTrendingUp,
+  FiTrendingDown,
   FiActivity,
   FiZap,
   FiTarget,
-  FiBarChart2
+  FiBarChart2,
 } from "react-icons/fi";
-import { 
+import {
   FaRocket,
   FaChartLine,
   FaBullseye,
   FaLightbulb,
   FaShieldAlt,
-  FaNetworkWired
+  FaNetworkWired,
 } from "react-icons/fa";
 
 const StatsCard = ({
@@ -31,46 +31,53 @@ const StatsCard = ({
 
   const colorClasses = {
     cyan: {
-      bg: "from-cyan-500/20 to-blue-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-cyan-500 to-blue-500",
       text: "text-cyan-400",
-      border: "border-cyan-500/30",
+      border: "border-cyan-500/50",
       glow: "from-cyan-500/30 via-blue-500/30 to-cyan-500/30",
     },
     purple: {
-      bg: "from-purple-500/20 to-pink-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-purple-500 to-pink-500",
       text: "text-purple-400",
-      border: "border-purple-500/30",
+      border: "border-purple-500/50",
       glow: "from-purple-500/30 via-pink-500/30 to-purple-500/30",
     },
     green: {
-      bg: "from-emerald-500/20 to-teal-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-emerald-500 to-teal-500",
       text: "text-emerald-400",
-      border: "border-emerald-500/30",
+      border: "border-emerald-500/50",
       glow: "from-emerald-500/30 via-teal-500/30 to-emerald-500/30",
     },
     orange: {
-      bg: "from-orange-500/20 to-yellow-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-orange-500 to-yellow-500",
       text: "text-orange-400",
-      border: "border-orange-500/30",
+      border: "border-orange-500/50",
       glow: "from-orange-500/30 via-yellow-500/30 to-orange-500/30",
     },
     red: {
-      bg: "from-red-500/20 to-pink-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-red-500 to-pink-500",
       text: "text-red-400",
-      border: "border-red-500/30",
+      border: "border-red-500/50",
       glow: "from-red-500/30 via-pink-500/30 to-red-500/30",
     },
     indigo: {
-      bg: "from-indigo-500/20 to-violet-500/20",
+      bg: "from-gray-800 to-gray-900",
       icon: "from-indigo-500 to-violet-500",
       text: "text-indigo-400",
-      border: "border-indigo-500/30",
+      border: "border-indigo-500/50",
       glow: "from-indigo-500/30 via-violet-500/30 to-indigo-500/30",
+    },
+    blue: {
+      bg: "from-gray-800 to-gray-900",
+      icon: "from-blue-500 to-cyan-500",
+      text: "text-blue-400",
+      border: "border-blue-500/50",
+      glow: "from-blue-500/30 via-cyan-500/30 to-blue-500/30",
     },
   };
 
@@ -109,34 +116,47 @@ const StatsCard = ({
   }
 
   return (
-    <div 
-      className={`group relative transition-all duration-500 ${isHovered ? 'transform scale-[1.02]' : ''} ${onClick ? 'cursor-pointer' : ''}`}
+    <div
+      className={`group relative transition-all duration-500 ${
+        isHovered ? "transform scale-[1.02]" : ""
+      } ${onClick ? "cursor-pointer" : ""}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={onClick}
     >
       {/* Animated Glow Background */}
-      <div className={`absolute -inset-1 bg-gradient-to-r ${colors.glow} rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500`}></div>
-      
+      <div
+        className={`absolute -inset-1 bg-gradient-to-r ${colors.glow} rounded-2xl blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500`}
+      ></div>
+
       {/* Grid Pattern */}
-      <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
+      <div
+        className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"
         style={{
           backgroundImage: `linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
                            linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)`,
-          backgroundSize: '25px 25px',
+          backgroundSize: "25px 25px",
         }}
       ></div>
 
-      <div className={`relative bg-gradient-to-br ${colors.bg} backdrop-blur-sm rounded-2xl border ${colors.border} p-6 transition-all duration-300 ${
-        onClick ? 'hover:border-cyan-500/50' : ''
-      }`}>
+      <div
+        className={`relative bg-gradient-to-br ${
+          colors.bg
+        } backdrop-blur-sm rounded-2xl border ${
+          colors.border
+        } p-6 transition-all duration-300 ${
+          onClick ? "hover:border-cyan-500/50" : ""
+        }`}
+      >
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-4">
-          <p className="text-sm font-medium text-gray-300">{title}</p>
-          
+          <p className="text-sm font-bold text-gray-100">{title}</p>
+
           {/* Trend Indicator */}
           {change && (
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/10 ${trendColors[trend]}`}>
+            <div
+              className={`flex items-center gap-1 px-2 py-1 rounded-full bg-white/5 border border-white/10 ${trendColors[trend]}`}
+            >
               {trendIcons[trend]}
               <span className="text-xs font-medium">{trendText[trend]}</span>
             </div>
@@ -145,15 +165,18 @@ const StatsCard = ({
 
         {/* Main Value */}
         <div className="mb-4">
-          <p className="text-3xl font-bold text-white">
+          <p className="text-4xl font-extrabold text-white">
             {value}
             {change && (
-              <span className={`ml-2 text-sm font-medium ${trendColors[trend]}`}>
-                {trend === 'up' ? '+' : trend === 'down' ? '-' : ''}{change}
+              <span
+                className={`ml-2 text-sm font-medium ${trendColors[trend]}`}
+              >
+                {trend === "up" ? "+" : trend === "down" ? "-" : ""}
+                {change}
               </span>
             )}
           </p>
-          
+
           {/* Description */}
           {description && (
             <p className="text-sm text-gray-400 mt-2">{description}</p>
@@ -164,8 +187,12 @@ const StatsCard = ({
         <div className="flex items-center justify-between mt-6">
           {/* Icon Container */}
           <div className="relative">
-            <div className={`absolute -inset-3 bg-gradient-to-r ${colors.icon} rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-300`}></div>
-            <div className={`relative w-12 h-12 rounded-xl bg-gradient-to-r ${colors.icon} flex items-center justify-center text-white shadow-lg transform group-hover:scale-110 transition-transform duration-300`}>
+            <div
+              className={`absolute -inset-3 bg-gradient-to-r ${colors.icon} rounded-xl blur opacity-0 group-hover:opacity-30 transition-opacity duration-300`}
+            ></div>
+            <div
+              className={`relative w-12 h-12 rounded-xl bg-gradient-to-r ${colors.icon} flex items-center justify-center text-white shadow-lg transform group-hover:scale-110 transition-transform duration-300`}
+            >
               {icon || <FaChartLine className="w-6 h-6" />}
             </div>
           </div>
@@ -174,15 +201,15 @@ const StatsCard = ({
           <div className="flex-1 max-w-32">
             <div className="flex justify-between text-xs text-gray-400 mb-1">
               <span>Progress</span>
-              <span>{change || '100%'}</span>
+              <span>{change || "100%"}</span>
             </div>
             <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-              <div 
+              <div
                 className={`h-full rounded-full bg-gradient-to-r ${colors.icon} transition-all duration-1000`}
-                style={{ 
-                  width: change 
-                    ? `${Math.min(parseInt(change), 100)}%` 
-                    : '100%' 
+                style={{
+                  width: change
+                    ? `${Math.min(parseInt(change), 100)}%`
+                    : "100%",
                 }}
               ></div>
             </div>
@@ -203,9 +230,9 @@ const StatsCard = ({
               className="absolute w-1 h-1 bg-white rounded-full animate-float"
               style={{
                 left: `${20 + i * 40}%`,
-                top: '30%',
+                top: "30%",
                 animationDelay: `${i * 0.3}s`,
-                animationDuration: '3s',
+                animationDuration: "3s",
               }}
             />
           ))}
