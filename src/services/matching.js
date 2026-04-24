@@ -31,7 +31,7 @@ import {
   storeAnswerKey,
   updateFoundItemIndexStatus,
 } from "./firestore";
-import { generateVerificationQuestions } from "../utils/ai";
+import { generateVerificationQuestions, generateMatchAssessment } from "../utils/ai";
 
 /**
  * Calculate similarity score between two strings using Jaccard similarity
@@ -218,8 +218,34 @@ export async function findMatchesForLostItem(lostItem, minScore = 0.5) {
     }
   });
 
-  // Sort by score descending
-  return matches.sort((a, b) => b.score - a.score);
+  // Sort by score descending and take top 5
+  const topMatches = matches.sort((a, b) => b.score - a.score).slice(0, 5);
+
+  // Deep scan with Gemini AI
+  const finalMatches = [];
+  for (const match of topMatches) {
+    try {
+      const aiAssessment = await generateMatchAssessment(
+        lostItem,
+        match.foundItem
+      );
+      if (aiAssessment) {
+        finalMatches.push({
+          ...match,
+          score: aiAssessment.aiScore,
+          breakdown: aiAssessment.breakdown,
+        });
+      } else {
+        finalMatches.push(match);
+      }
+    } catch (err) {
+      console.warn("AI assessment failed, using Jaccard score", err);
+      finalMatches.push(match);
+    }
+  }
+
+  // Final sort by AI score
+  return finalMatches.sort((a, b) => b.score - a.score);
 }
 
 /**
@@ -257,8 +283,34 @@ export async function findMatchesForFoundItem(foundItem, minScore = 0.5) {
     }
   });
 
-  // Sort by score descending
-  return matches.sort((a, b) => b.score - a.score);
+  // Sort by score descending and take top 5
+  const topMatches = matches.sort((a, b) => b.score - a.score).slice(0, 5);
+
+  // Deep scan with Gemini AI
+  const finalMatches = [];
+  for (const match of topMatches) {
+    try {
+      const aiAssessment = await generateMatchAssessment(
+        match.lostItem,
+        foundItem
+      );
+      if (aiAssessment) {
+        finalMatches.push({
+          ...match,
+          score: aiAssessment.aiScore,
+          breakdown: aiAssessment.breakdown,
+        });
+      } else {
+        finalMatches.push(match);
+      }
+    } catch (err) {
+      console.warn("AI assessment failed, using Jaccard score", err);
+      finalMatches.push(match);
+    }
+  }
+
+  // Final sort by AI score
+  return finalMatches.sort((a, b) => b.score - a.score);
 }
 
 /**

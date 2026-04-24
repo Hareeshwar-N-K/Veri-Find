@@ -18,6 +18,7 @@ import {
   getLostItem,
   getFoundItem,
   deleteLostItem,
+  deleteFoundItem,
   getMyMatches,
   updateLostItem,
   updateFoundItem,
@@ -84,6 +85,14 @@ const ItemStatus = () => {
         setItem(itemData);
         setItemType("lost");
 
+        // Get existing matches for this item first
+        let itemMatches = [];
+        if (user) {
+          const myMatches = await getMyMatches();
+          itemMatches = myMatches.filter((m) => m.lostItemId === id);
+          setExistingMatches(itemMatches);
+        }
+
         // If it's the owner's item, find potential matches
         if (
           user &&
@@ -93,18 +102,16 @@ const ItemStatus = () => {
           setMatchingLoading(true);
           try {
             const matches = await findMatchesForLostItem(itemData);
-            setPotentialMatches(matches);
+            // Filter out found items that already have a match
+            const existingFoundIds = itemMatches.map((m) => m.foundItemId);
+            const newMatches = matches.filter(
+              (m) => !existingFoundIds.includes(m.foundItem.id)
+            );
+            setPotentialMatches(newMatches);
           } catch (err) {
             console.error("Error finding matches:", err);
           }
           setMatchingLoading(false);
-        }
-
-        // Get existing matches for this item
-        if (user) {
-          const myMatches = await getMyMatches();
-          const itemMatches = myMatches.filter((m) => m.lostItemId === id);
-          setExistingMatches(itemMatches);
         }
       } else {
         // Try found_items
@@ -112,6 +119,14 @@ const ItemStatus = () => {
         if (itemData) {
           setItem(itemData);
           setItemType("found");
+
+          // Get existing matches for this item first
+          let itemMatches = [];
+          if (user) {
+            const myMatches = await getMyMatches();
+            itemMatches = myMatches.filter((m) => m.foundItemId === id);
+            setExistingMatches(itemMatches);
+          }
 
           // If it's the finder's item, find potential matches
           if (
@@ -122,18 +137,16 @@ const ItemStatus = () => {
             setMatchingLoading(true);
             try {
               const matches = await findMatchesForFoundItem(itemData);
-              setPotentialMatches(matches);
+              // Filter out lost items that already have a match
+              const existingLostIds = itemMatches.map((m) => m.lostItemId);
+              const newMatches = matches.filter(
+                (m) => !existingLostIds.includes(m.lostItem.id)
+              );
+              setPotentialMatches(newMatches);
             } catch (err) {
               console.error("Error finding matches:", err);
             }
             setMatchingLoading(false);
-          }
-
-          // Get existing matches for this item
-          if (user) {
-            const myMatches = await getMyMatches();
-            const itemMatches = myMatches.filter((m) => m.foundItemId === id);
-            setExistingMatches(itemMatches);
           }
         }
       }
@@ -164,11 +177,17 @@ const ItemStatus = () => {
 
       if (itemType === "lost") {
         // Creating match from lost item perspective
-        await createMatch(item, matchData.foundItem, matchData.score);
+        await createMatch(item, matchData.foundItem, {
+          score: matchData.score,
+          breakdown: matchData.breakdown,
+        });
         toast.success("Match created! Waiting for verification.");
       } else {
         // Creating match from found item perspective
-        await createMatch(matchData.lostItem, item, matchData.score);
+        await createMatch(matchData.lostItem, item, {
+          score: matchData.score,
+          breakdown: matchData.breakdown,
+        });
         toast.success("Match created! Owner will be notified.");
       }
 
@@ -187,7 +206,11 @@ const ItemStatus = () => {
     if (!window.confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      await deleteLostItem(id);
+      if (itemType === "lost") {
+        await deleteLostItem(id);
+      } else {
+        await deleteFoundItem(id);
+      }
       toast.success("Item deleted successfully");
       navigate("/dashboard");
     } catch (error) {
@@ -955,7 +978,7 @@ const ItemStatus = () => {
       )}
 
       {/* Add custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes gradient {
           0%,
           100% {

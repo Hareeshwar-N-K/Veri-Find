@@ -609,7 +609,7 @@ const Dashboard = () => {
       </div>
 
       {/* Add minimal CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes spin {
           from {
             transform: rotate(0deg);

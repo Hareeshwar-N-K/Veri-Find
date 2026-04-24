@@ -227,7 +227,7 @@ function Login() {
       </div>
 
       {/* Add custom CSS for animations */}
-      <style jsx>{`
+      <style>{`
         @keyframes gradient {
           0%,
           100% {

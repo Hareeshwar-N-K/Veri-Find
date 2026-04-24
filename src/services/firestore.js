@@ -34,6 +34,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
 import { generateHandshakePhrase } from "../utils/helpers";
+import { applyReputationCap } from "../utils/fairness";
 
 // Collection names
 export const COLLECTIONS = {
@@ -310,10 +311,41 @@ export async function getFoundItem(itemId) {
  */
 export async function updateFoundItem(itemId, data) {
   const docRef = doc(db, COLLECTIONS.FOUND_ITEMS, itemId);
+  
+  // Format location if provided
+  const updateData = { ...data };
+  if (updateData.locationName) {
+    updateData.locationFound = { name: updateData.locationName };
+    delete updateData.locationName;
+  }
+  
   await updateDoc(docRef, {
-    ...data,
+    ...updateData,
     updatedAt: serverTimestamp(),
   });
+  
+  // Also update the index if location changed
+  if (updateData.locationFound) {
+    try {
+      const indexRef = doc(db, COLLECTIONS.FOUND_ITEMS_INDEX, itemId);
+      await updateDoc(indexRef, {
+        locationName: updateData.locationFound.name,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.warn("Could not update index", error);
+    }
+  }
+}
+
+/**
+ * Delete found item
+ */
+export async function deleteFoundItem(itemId) {
+  // Delete the main item
+  await deleteDoc(doc(db, COLLECTIONS.FOUND_ITEMS, itemId));
+  // Delete the index entry
+  await deleteDoc(doc(db, COLLECTIONS.FOUND_ITEMS_INDEX, itemId));
 }
 
 // ============================================
@@ -426,8 +458,16 @@ export async function getLostItem(itemId) {
  */
 export async function updateLostItem(itemId, data) {
   const docRef = doc(db, COLLECTIONS.LOST_ITEMS, itemId);
+  const updateData = { ...data };
+  
+  // Format location if provided
+  if (updateData.locationName) {
+    updateData.locationLost = { name: updateData.locationName };
+    delete updateData.locationName;
+  }
+  
   await updateDoc(docRef, {
-    ...data,
+    ...updateData,
     updatedAt: serverTimestamp(),
   });
 }
@@ -1028,22 +1068,32 @@ export async function awardReputationForRecovery(matchId, role) {
   const field = role === "finder" ? "itemsReturned" : "itemsRecovered";
 
   const userRef = doc(db, COLLECTIONS.USERS, currentUser.uid);
-  await updateDoc(userRef, {
-    reputationPoints: increment(points),
-    [field]: increment(1),
-    updatedAt: serverTimestamp(),
-  });
-
-  // Sync to public profile
   const userSnap = await getDoc(userRef);
-  const userData = userSnap.data();
-  await syncUserPublic(currentUser.uid, {
-    displayName: userData.displayName,
-    photoURL: userData.photoURL,
-    reputationPoints: userData.reputationPoints,
-    badges: userData.badges || [],
-    [field]: userData[field],
-  });
+  const userData = userSnap.data() || {};
+  const currentWeeklyPoints = userData.weeklyReputationPoints || 0;
+
+  const { allowed, capped } = applyReputationCap(currentWeeklyPoints, points);
+
+  if (allowed > 0) {
+    await updateDoc(userRef, {
+      reputationPoints: increment(allowed),
+      weeklyReputationPoints: increment(allowed),
+      [field]: increment(1),
+      updatedAt: serverTimestamp(),
+    });
+
+    // Re-fetch to sync
+    const updatedUserSnap = await getDoc(userRef);
+    const updatedUserData = updatedUserSnap.data();
+    
+    await syncUserPublic(currentUser.uid, {
+      displayName: updatedUserData.displayName,
+      photoURL: updatedUserData.photoURL,
+      reputationPoints: updatedUserData.reputationPoints,
+      badges: updatedUserData.badges || [],
+      [field]: updatedUserData[field],
+    });
+  }
 
   // Audit log
   try {
@@ -1232,6 +1282,7 @@ export default {
   getMyFoundItems,
   getFoundItem,
   updateFoundItem,
+  deleteFoundItem,
   // Found Items Index
   getFoundItemsIndex,
   updateFoundItemIndexStatus,

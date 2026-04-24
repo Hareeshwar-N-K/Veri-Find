@@ -6,6 +6,7 @@
  */
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { validateQuizFairness } from "./fairness";
 
 // Initialize the Gemini API
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -81,6 +82,7 @@ IMPORTANT RULES:
 3. If a specific detail (like color, brand, model) is mentioned, use it
 4. The correct answer MUST be directly from the description
 5. Wrong options should be plausible alternatives for that attribute
+6. Do NOT use complex vocabulary, idiomatic expressions, or culture-specific references. Use global, plain English.
 
 ═══════════════════════════════════════════════════════════════
 COMPLETE ITEM INFORMATION (FINDER'S REPORT):
@@ -248,6 +250,13 @@ RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.`;
       }
     }
 
+    const fairnessReport = validateQuizFairness(quizData.questions);
+    
+    if (!fairnessReport.passed) {
+      console.warn("AI generated complex/unfair questions. Using fallback.", fairnessReport);
+      return generateFallbackQuestions(category);
+    }
+
     return {
       questions: quizData.questions.map((q) => ({
         question: q.question,
@@ -257,6 +266,7 @@ RESPOND WITH ONLY THE JSON OBJECT. NO OTHER TEXT.`;
       })),
       hint: quizData.hint || "Think carefully about your item",
       generatedByAI: true,
+      fairnessReport,
     };
   } catch (error) {
     console.error("Error generating AI questions:", error);
@@ -342,24 +352,24 @@ function generateFallbackQuestions(category) {
     electronics: {
       questions: [
         {
-          question: "What is the primary color of your device or its case?",
-          options: ["Black", "White/Silver", "Blue", "Other color"],
+          question: "What is the main color of your device or its case?",
+          options: ["Black", "White or Silver", "Blue", "Other color"],
           correctIndex: 0,
           difficulty: "easy",
         },
         {
-          question: "What is the approximate storage capacity of your device?",
+          question: "How much storage does your device have?",
           options: ["32GB or less", "64GB", "128GB", "256GB or more"],
           correctIndex: 1,
           difficulty: "medium",
         },
         {
-          question: "What personalization or mark is on your device?",
+          question: "What special mark is on your device?",
           options: [
             "Sticker on the back",
             "Screen protector with crack",
-            "Scratches near charging port",
-            "No visible personalization",
+            "Scratches near plug",
+            "No special marks",
           ],
           correctIndex: 0,
           difficulty: "hard",
@@ -404,28 +414,28 @@ function generateFallbackQuestions(category) {
       questions: [
         {
           question: "How many keys are on your keyring?",
-          options: ["1-2 keys", "3-4 keys", "5-6 keys", "7 or more keys"],
+          options: ["1 to 2", "3 to 4", "5 to 6", "7 or more"],
           correctIndex: 1,
           difficulty: "easy",
         },
         {
           question: "What type of keychain is attached?",
           options: [
-            "Metal keychain",
-            "Plastic/rubber keychain",
-            "Fabric lanyard",
+            "Metal",
+            "Plastic or rubber",
+            "Cloth",
             "No keychain",
           ],
           correctIndex: 0,
           difficulty: "medium",
         },
         {
-          question: "What is the color of your most used key?",
+          question: "What color is your most used key?",
           options: [
-            "Silver/Chrome",
-            "Gold/Brass",
-            "Bronze/Copper",
-            "Painted/Colored",
+            "Silver",
+            "Gold",
+            "Bronze",
+            "Painted color",
           ],
           correctIndex: 0,
           difficulty: "hard",
@@ -474,34 +484,34 @@ function generateFallbackQuestions(category) {
     clothing: {
       questions: [
         {
-          question: "What is the primary color of the item?",
+          question: "What is the main color of the clothing?",
           options: [
-            "Black/Dark gray",
-            "White/Cream",
-            "Blue/Navy",
+            "Black or dark gray",
+            "White or cream",
+            "Blue or navy",
             "Other color",
           ],
           correctIndex: 0,
           difficulty: "easy",
         },
         {
-          question: "What size is the clothing item?",
+          question: "What size is the clothing?",
           options: [
-            "Small (S)",
-            "Medium (M)",
-            "Large (L)",
-            "Extra Large (XL+)",
+            "Small",
+            "Medium",
+            "Large",
+            "Extra large",
           ],
           correctIndex: 1,
           difficulty: "medium",
         },
         {
-          question: "What distinguishing feature is on the item?",
+          question: "What special mark is on the item?",
           options: [
-            "Tag partially torn",
-            "Small stain or mark",
+            "Torn tag",
+            "Small stain",
             "Name written inside",
-            "No distinguishing marks",
+            "No mark",
           ],
           correctIndex: 3,
           difficulty: "hard",
@@ -513,28 +523,28 @@ function generateFallbackQuestions(category) {
       questions: [
         {
           question: "What is the main color of the bag?",
-          options: ["Black", "Brown/Tan", "Navy/Blue", "Other color"],
+          options: ["Black", "Brown or tan", "Blue or navy", "Other color"],
           correctIndex: 0,
           difficulty: "easy",
         },
         {
-          question: "How many main compartments does the bag have?",
+          question: "How many main pockets does the bag have?",
           options: [
-            "1 compartment",
-            "2 compartments",
-            "3 compartments",
+            "1",
+            "2",
+            "3",
             "4 or more",
           ],
           correctIndex: 1,
           difficulty: "medium",
         },
         {
-          question: "What is inside a hidden pocket of the bag?",
+          question: "What is in a hidden pocket of the bag?",
           options: [
-            "Emergency cash",
-            "Old ticket or receipt",
+            "Cash",
+            "Old ticket",
             "Spare key",
-            "Nothing special",
+            "Nothing",
           ],
           correctIndex: 3,
           difficulty: "hard",
@@ -583,34 +593,34 @@ function generateFallbackQuestions(category) {
     other: {
       questions: [
         {
-          question: "What is the primary color of the item?",
+          question: "What is the main color of the item?",
           options: [
-            "Black/Dark",
-            "White/Light",
-            "Colorful/Mixed",
-            "Metallic/Chrome",
+            "Black or dark",
+            "White or light",
+            "Colorful",
+            "Silver or metal",
           ],
           correctIndex: 0,
           difficulty: "easy",
         },
         {
-          question: "What is the approximate size of the item?",
+          question: "How big is the item?",
           options: [
-            "Small (fits in pocket)",
-            "Medium (fits in hand)",
-            "Large (need a bag)",
+            "Fits in pocket",
+            "Fits in hand",
+            "Needs a bag",
             "Very large",
           ],
           correctIndex: 1,
           difficulty: "medium",
         },
         {
-          question: "What unique feature does your item have?",
+          question: "What makes your item unique?",
           options: [
-            "Visible scratch or dent",
-            "Custom modification",
-            "Wear marks from use",
-            "No unique features",
+            "Scratch or dent",
+            "Custom change",
+            "Wear marks",
+            "Nothing special",
           ],
           correctIndex: 2,
           difficulty: "hard",
@@ -627,6 +637,7 @@ function generateFallbackQuestions(category) {
     questions: fallback.questions,
     hint: fallback.hint,
     generatedByAI: false,
+    fairnessReport: { passed: true, report: [], unfairCount: 0 },
   };
 }
 
@@ -714,7 +725,7 @@ Lost Item: ${lostItem.title} - ${lostItem.description}
 Found Item: ${foundItem.title} - ${foundItem.description}
 Match Score: ${Math.round(score * 100)}%
 
-Be helpful and encouraging but cautious. Don't confirm it's definitely the same item.`;
+Use simple plain English. Be helpful but cautious. Do not confirm it is definitely the same item.`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
@@ -727,10 +738,101 @@ Be helpful and encouraging but cautious. Don't confirm it's definitely the same 
   }
 }
 
+/**
+ * Generate a deep semantic match assessment using Gemini API
+ *
+ * @param {object} lostItem - The lost item data
+ * @param {object} foundItem - The found item data (might be index data only)
+ * @returns {Promise<{ aiScore: number, breakdown: { title: number, description: number, category: number, location: number, date: number } }>}
+ */
+export async function generateMatchAssessment(lostItem, foundItem) {
+  const ai = getGenAI();
+
+  if (!ai) {
+    throw new Error("Gemini AI is not available");
+  }
+
+  try {
+    const model = ai.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+
+    // Format the date strings safely
+    const formatSafeDate = (timestamp) => {
+      if (!timestamp) return "Unknown";
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString();
+    };
+
+    const prompt = `As an expert matching algorithm for a lost and found platform, analyze the probability that the following two reports describe the EXACT SAME item.
+    
+Lost Item Report:
+- Title: ${lostItem.title || "N/A"}
+- Description: ${lostItem.description || "N/A"}
+- Category: ${lostItem.category || "N/A"}
+- Location Lost: ${lostItem.locationLost?.name || "N/A"}
+- Date Lost: ${formatSafeDate(lostItem.dateLost)}
+
+Found Item Report:
+- Title: ${foundItem.title || "N/A"}
+- Description: ${foundItem.description || "N/A"}
+- Category: ${foundItem.category || "N/A"}
+- Location Found: ${foundItem.locationFound?.name || foundItem.locationName || "N/A"}
+- Date Found: ${formatSafeDate(foundItem.dateFound)}
+
+Note: The found item report might be missing a title and description for privacy reasons. If so, rely heavily on the category, location, and date alignment.
+Keep in mind that a found date should generally be on or AFTER the lost date.
+
+Return ONLY a valid JSON object matching this exact structure, with scores between 0.0 and 1.0 representing the confidence of a match for each aspect.
+{
+  "aiScore": 0.85,
+  "breakdown": {
+    "title": 0.8,
+    "description": 0.7,
+    "category": 1.0,
+    "location": 0.9,
+    "date": 0.8
+  }
+}`;
+
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+
+    // Extract JSON from response (handle markdown code blocks)
+    let jsonText = text;
+    if (text.includes("```json")) {
+      jsonText = text.split("```json")[1].split("```")[0].trim();
+    } else if (text.includes("```")) {
+      jsonText = text.split("```")[1].split("```")[0].trim();
+    }
+    
+    const data = JSON.parse(jsonText);
+
+    return {
+      aiScore: data.aiScore || 0,
+      breakdown: {
+        title: data.breakdown?.title || 0,
+        description: data.breakdown?.description || 0,
+        category: data.breakdown?.category || 0,
+        location: data.breakdown?.location || 0,
+        date: data.breakdown?.date || 0,
+      }
+    };
+  } catch (error) {
+    if (error?.message?.includes("503") || error?.status === 503) {
+      console.warn("Gemini AI is currently experiencing high demand (503). Gracefully falling back to baseline Jaccard match scoring.");
+    } else {
+      console.warn("Gemini Match Assessment unavailable. Falling back to baseline scoring.", error.message);
+    }
+    // If AI fails, return null so the caller can fallback to the standard score
+    return null;
+  }
+}
+
 export default {
   generateVerificationQuestion,
   generateVerificationQuestions,
   verifyQuizAnswer,
   verifyAllQuizAnswers,
   generateMatchExplanation,
+  generateMatchAssessment,
 };

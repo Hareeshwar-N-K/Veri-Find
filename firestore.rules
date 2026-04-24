@@ -83,7 +83,7 @@ service cloud.firestore {
       // Users can increment their own reputation (for recovery flow only)
       // Restricted: can only increment, not set arbitrary values
       allow update: if isOwner(userId) 
-        && onlyUpdating(['reputationPoints', 'itemsReturned', 'itemsRecovered', 'updatedAt'])
+        && onlyUpdating(['reputationPoints', 'weeklyReputationPoints', 'itemsReturned', 'itemsRecovered', 'updatedAt'])
         && request.resource.data.reputationPoints >= resource.data.get('reputationPoints', 0);
       
       // Admins can update any user (including role, suspension)
@@ -140,7 +140,7 @@ service cloud.firestore {
       
       // Finder can update their own item (limited fields)
       allow update: if isOwner(resource.data.finderId)
-        && onlyUpdating(['title', 'description', 'currentStorageLocation', 
+        && onlyUpdating(['title', 'description', 'locationFound', 'currentStorageLocation', 
                          'images', 'status', 'updatedAt'])
         && request.resource.data.finderId == resource.data.finderId;
       
@@ -150,8 +150,9 @@ service cloud.firestore {
       // Admins/Moderators can update status and other fields
       allow update: if isModerator();
       
-      // Only admins can delete
-      allow delete: if isAdmin();
+      // Finder or admin can delete
+      allow delete: if isAuthenticated() 
+        && (resource.data.finderId == request.auth.uid || isAdmin());
     }
     
     // ============================================
@@ -173,10 +174,10 @@ service cloud.firestore {
         && !request.resource.data.keys()
             .hasAny(['description', 'images', 'currentStorageLocation', 'title']);
       
-      // Finder can update status only
+      // Finder can update status and location
       allow update: if isAuthenticated()
         && resource.data.finderId == request.auth.uid
-        && onlyUpdating(['status', 'updatedAt']);
+        && onlyUpdating(['status', 'locationName', 'updatedAt']);
       
       // Admins/moderators can update
       allow update: if isModerator();
