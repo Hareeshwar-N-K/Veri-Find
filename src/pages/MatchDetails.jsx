@@ -12,6 +12,7 @@ import {
   FiAlertCircle,
   FiShield,
   FiTarget,
+  FiFlag,
 } from "react-icons/fi";
 import {
   FaRocket,
@@ -27,8 +28,13 @@ import {
   updateMatchStatus,
   getLostItem,
   getFoundItem,
+  submitQuizAnswers,
+  validateAndSetQuizResult,
+  revertItemStatuses,
+  reportMatchIssue,
+  awardReputationForRecovery,
+  createRecoveryEntry,
 } from "../services/firestore";
-import { verifyMatch } from "../services/matching";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 
@@ -50,6 +56,9 @@ const MatchDetail = () => {
   const [quizAnswers, setQuizAnswers] = useState([]);
   const [showRecoveryConfirm, setShowRecoveryConfirm] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [validatingQuiz, setValidatingQuiz] = useState(false);
+  const [showReportIssue, setShowReportIssue] = useState(false);
+  const [reportReason, setReportReason] = useState("");
 
   useEffect(() => {
     fetchMatch();
@@ -90,9 +99,11 @@ const MatchDetail = () => {
         console.log("Fetching full item details...");
 
         // Fetch lost and found items
+        // Note: getFoundItem may fail for the owner because found_items
+        // is locked to finder+admin. That's OK — we have match doc data.
         const [lostItemData, foundItemData] = await Promise.all([
           getLostItem(matchData.lostItemId),
-          getFoundItem(matchData.foundItemId),
+          getFoundItem(matchData.foundItemId).catch(() => null),
         ]);
 
         console.log("Lost item:", lostItemData);
@@ -131,15 +142,55 @@ const MatchDetail = () => {
     }
   };
 
+  // SECURITY: Auto-validate quiz when finder views a "quiz_submitted" match
+  useEffect(() => {
+    if (!match || !user) return;
+    const isFinder = user.uid === match.finderId;
+    if (isFinder && match.status === "quiz_submitted" && !validatingQuiz) {
+      handleFinderValidation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match, user]);
+
+  /**
+   * Finder auto-validates quiz when they open a quiz_submitted match.
+   * Reads the answer_key subcollection (only finder can read), compares
+   * with the owner's submission, and updates match status.
+   */
+  const handleFinderValidation = async () => {
+    if (validatingQuiz) return;
+    setValidatingQuiz(true);
+    try {
+      const result = await validateAndSetQuizResult(match.id);
+      if (result.passed) {
+        toast.success(
+          `✅ Owner passed verification! (${result.correctCount}/${result.total} correct)`
+        );
+      } else {
+        toast.error(
+          `❌ Owner failed verification. (${result.correctCount}/${result.total} correct)`
+        );
+      }
+      fetchMatch();
+    } catch (error) {
+      console.error("Error validating quiz:", error);
+      toast.error("Failed to validate quiz answers");
+    } finally {
+      setValidatingQuiz(false);
+    }
+  };
+
   const handleVerify = async (isValid) => {
     if (!user || !match) return;
 
     if (!isValid) {
-      // User clicked "Not My Item"
+      // User clicked "Not My Item" → reject and revert item statuses
       try {
         setVerifying(true);
         await updateMatchStatus(match.id, "rejected");
-        toast("Match rejected", {
+        // SECURITY FIX: Revert items back to searchable state
+        await revertItemStatuses(match.lostItemId, match.foundItemId);
+        toast("Match rejected — items returned to search pool", {
           icon: "ℹ️",
           style: {
             background: "#1e293b",
@@ -168,21 +219,17 @@ const MatchDetail = () => {
       );
       setShowQuiz(true);
     } else {
-      // No quiz available, auto-verify (fallback)
-      try {
-        setVerifying(true);
-        await updateMatchStatus(match.id, "verified");
-        toast.success("Match verified successfully!");
-        fetchMatch();
-      } catch (error) {
-        console.error("Error verifying match:", error);
-        toast.error("Failed to verify match");
-      } finally {
-        setVerifying(false);
-      }
+      // No quiz available — cannot verify without quiz (security requirement)
+      toast.error("Verification quiz is not ready yet. Please try again later.");
     }
   };
 
+  /**
+   * SECURITY FIX: Owner submits quiz answers to Firestore.
+   * The answers are stored in the match doc, and the status changes
+   * to "quiz_submitted". The FINDER's client will validate the answers
+   * by reading the answer_key subcollection (which the owner can't access).
+   */
   const handleSubmitQuiz = async () => {
     if (!match || !match.verificationQuiz) return;
 
@@ -196,43 +243,19 @@ const MatchDetail = () => {
     try {
       setVerifying(true);
 
-      // Calculate score
-      const questions = match.verificationQuiz.questions;
-      let correctCount = 0;
+      // Submit answers to Firestore — status becomes "quiz_submitted"
+      // The finder will validate these answers on their next visit
+      await submitQuizAnswers(match.id, quizAnswers);
 
-      questions.forEach((q, index) => {
-        if (quizAnswers[index] === q.correctIndex) {
-          correctCount++;
-        }
-      });
-
-      const totalQuestions = questions.length;
-      const requiredCorrect = Math.ceil((totalQuestions * 2) / 3); // 2/3 must be correct
-
-      console.log(
-        `Quiz result: ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`
+      toast.success(
+        "✅ Answers submitted! The finder will verify your responses.",
+        { duration: 5000 }
       );
-
-      if (correctCount >= requiredCorrect) {
-        // Pass verification
-        await updateMatchStatus(match.id, "verified");
-        toast.success(
-          `✅ Verification Passed! (${correctCount}/${totalQuestions} correct)`
-        );
-        setShowQuiz(false);
-        fetchMatch();
-      } else {
-        // Fail verification
-        await updateMatchStatus(match.id, "rejected");
-        toast.error(
-          `❌ Verification Failed. Only ${correctCount}/${totalQuestions} correct (need ${requiredCorrect})`
-        );
-        setShowQuiz(false);
-        fetchMatch();
-      }
+      setShowQuiz(false);
+      fetchMatch();
     } catch (error) {
       console.error("Error submitting quiz:", error);
-      toast.error("Failed to submit verification");
+      toast.error("Failed to submit verification answers");
     } finally {
       setVerifying(false);
     }
@@ -246,6 +269,22 @@ const MatchDetail = () => {
 
       if (recovered) {
         await updateMatchStatus(match.id, "recovered");
+
+        // SECURITY: Award reputation to SELF only.
+        // Owner gets +10 for recovering their item.
+        try {
+          await awardReputationForRecovery(match.id, "owner");
+        } catch (e) {
+          console.error("Failed to award owner reputation:", e);
+        }
+
+        // Create public recovery ledger entry
+        try {
+          await createRecoveryEntry(match);
+        } catch (e) {
+          console.error("Failed to create recovery entry:", e);
+        }
+
         toast.success("🎉 Item marked as recovered! Congratulations!");
       } else {
         toast("Item recovery pending", {
@@ -268,6 +307,26 @@ const MatchDetail = () => {
     }
   };
 
+  /**
+   * Handle reporting an issue on a stale verified match (hostage prevention).
+   */
+  const handleReportIssue = async () => {
+    if (!reportReason.trim()) {
+      toast.error("Please describe the issue");
+      return;
+    }
+    try {
+      await reportMatchIssue(match.id, reportReason);
+      toast.success("Issue reported. An admin will review this match.");
+      setShowReportIssue(false);
+      setReportReason("");
+      fetchMatch();
+    } catch (error) {
+      console.error("Error reporting issue:", error);
+      toast.error("Failed to report issue");
+    }
+  };
+
   const formatDate = (timestamp) => {
     if (!timestamp) return "Unknown";
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -281,10 +340,20 @@ const MatchDetail = () => {
         icon: FiAlertCircle,
         text: "Verification Required",
       },
+      quiz_submitted: {
+        color: "from-blue-500/20 to-indigo-500/20 text-blue-300",
+        icon: FiShield,
+        text: "Quiz Submitted — Awaiting Finder Validation",
+      },
       verified: {
         color: "from-green-500/20 to-emerald-500/20 text-green-300",
         icon: FiCheckCircle,
         text: "Verified",
+      },
+      verification_failed: {
+        color: "from-red-500/20 to-orange-500/20 text-red-300",
+        icon: FiXCircle,
+        text: "Verification Failed",
       },
       rejected: {
         color: "from-red-500/20 to-pink-500/20 text-red-300",
@@ -295,6 +364,11 @@ const MatchDetail = () => {
         color: "from-emerald-500/20 to-teal-500/20 text-emerald-300",
         icon: FiCheckCircle,
         text: "Recovered",
+      },
+      finder_withdrawn: {
+        color: "from-gray-500/20 to-slate-500/20 text-gray-300",
+        icon: FiXCircle,
+        text: "Finder Withdrawn",
       },
     };
     return statusMap[status] || statusMap.pending_verification;
@@ -609,6 +683,65 @@ const MatchDetail = () => {
                 </div>
               </div>
             </div>
+
+            {/* Zero-Trust Handshake (Physical Verification) */}
+            {(match.status === "verified" || match.status === "recovered") && match.handshakePhrase && (
+              <div
+                className={`bg-[#0a0a1a]/80 backdrop-blur-md rounded-2xl p-8 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.2)] transition-all duration-1000 ${
+                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                }`}
+                style={{ animationDelay: "0.2s" }}
+              >
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-12 h-12 rounded-lg bg-cyan-500/10 border border-cyan-500/50 flex items-center justify-center">
+                    <FaShieldAlt className="text-cyan-400 text-2xl animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent tracking-wider">
+                      ZERO-TRUST HANDSHAKE
+                    </h2>
+                    <p className="text-cyan-400/80 text-sm font-mono mt-1">
+                      PHYSICAL VERIFICATION PROTOCOL
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mb-8 p-4 bg-cyan-950/30 rounded-xl border border-cyan-900/50 text-sm text-cyan-200/70 font-mono">
+                  <p className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">⚠️</span>
+                    When meeting in person, you must verify the other person by completing this phrase together. Do not hand over the item if they cannot provide their half of the phrase.
+                  </p>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-center p-6 bg-black/40 rounded-xl border border-white/5">
+                  {/* Words 1 & 2 (Owner) */}
+                  <div className={`flex gap-3 ${isOwner ? 'opacity-100' : 'opacity-30 blur-sm select-none'}`}>
+                    <div className="px-6 py-3 bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 rounded-lg font-mono text-xl font-bold text-cyan-300 tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                      {isOwner ? match.handshakePhrase[0].toUpperCase() : 'XXXXXX'}
+                    </div>
+                    <div className="px-6 py-3 bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 rounded-lg font-mono text-xl font-bold text-cyan-300 tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.2)]">
+                      {isOwner ? match.handshakePhrase[1].toUpperCase() : 'XXXXXX'}
+                    </div>
+                  </div>
+
+                  <div className="text-cyan-500/50 text-2xl font-light mx-4 md:rotate-0 rotate-90">+</div>
+
+                  {/* Words 3 & 4 (Finder) */}
+                  <div className={`flex gap-3 ${!isOwner ? 'opacity-100' : 'opacity-30 blur-sm select-none'}`}>
+                    <div className="px-6 py-3 bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 rounded-lg font-mono text-xl font-bold text-purple-300 tracking-widest shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                      {!isOwner ? match.handshakePhrase[2].toUpperCase() : 'XXXXXX'}
+                    </div>
+                    <div className="px-6 py-3 bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 rounded-lg font-mono text-xl font-bold text-purple-300 tracking-widest shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                      {!isOwner ? match.handshakePhrase[3].toUpperCase() : 'XXXXXX'}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="mt-6 text-center text-xs text-gray-500 font-mono tracking-widest">
+                  YOUR ROLE: <span className={isOwner ? "text-cyan-400" : "text-purple-400"}>{isOwner ? "OWNER (FIRST HALF)" : "FINDER (SECOND HALF)"}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Sidebar */}
@@ -685,6 +818,65 @@ const MatchDetail = () => {
                     {confirming ? "Processing..." : "Not Yet"}
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Report Issue - Hostage Prevention (show for verified matches) */}
+            {isOwner && match.status === "verified" && !match.ownerReportedIssue && (
+              <div
+                className={`bg-gradient-to-br from-amber-500/10 to-orange-500/10 backdrop-blur-sm rounded-2xl p-6 border border-amber-500/30 transition-all duration-1000 ${
+                  isVisible
+                    ? "opacity-100 translate-y-0"
+                    : "opacity-0 translate-y-10"
+                }`}
+              >
+                <h2 className="text-lg font-bold mb-4 flex items-center gap-3 text-amber-300">
+                  <FiFlag />
+                  Having trouble getting your item?
+                </h2>
+                {!showReportIssue ? (
+                  <button
+                    onClick={() => setShowReportIssue(true)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 text-amber-300 rounded-xl hover:border-amber-400 transition-all"
+                  >
+                    <FiFlag className="w-4 h-4" />
+                    Report Issue
+                  </button>
+                ) : (
+                  <div className="space-y-3">
+                    <textarea
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      placeholder="Describe the issue (e.g., finder not responding, refusing to return item...)"
+                      className="w-full p-3 bg-white/5 border border-amber-500/30 rounded-xl text-white placeholder-gray-400 text-sm resize-none"
+                      rows={3}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleReportIssue}
+                        className="flex-1 px-4 py-2 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded-xl hover:border-amber-400 transition-all text-sm"
+                      >
+                        Submit Report
+                      </button>
+                      <button
+                        onClick={() => { setShowReportIssue(false); setReportReason(""); }}
+                        className="px-4 py-2 bg-gray-500/20 border border-gray-500/30 text-gray-300 rounded-xl hover:border-gray-400 transition-all text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Issue Already Reported */}
+            {match.ownerReportedIssue && (
+              <div className="bg-amber-500/10 backdrop-blur-sm rounded-2xl p-4 border border-amber-500/30">
+                <p className="text-amber-300 text-sm flex items-center gap-2">
+                  <FiFlag className="w-4 h-4" />
+                  Issue reported — admin will review this match.
+                </p>
               </div>
             )}
 

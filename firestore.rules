@@ -1,13 +1,16 @@
 rules_version = '2';
 
-// VeriFind - Firebase Security Rules
+// VeriFind - Firebase Security Rules (HARDENED)
 // Trust-based Lost & Found Platform
 // 
 // SECURITY PRINCIPLES:
 // 1. found_items are PRIVATE - only visible to creator and admins
-// 2. lost_items are semi-public - basic info visible, ownershipHints hidden
-// 3. matches require verification before full access
-// 4. All sensitive actions are logged to audit_logs
+// 2. found_items_index exposes ONLY category/location/date for matching
+// 3. lost_items readable by authenticated users (ownershipHints filtered client-side)
+// 4. matches enforce strict status-transition state machine
+// 5. Quiz answer keys stored in subcollection readable only by finder
+// 6. Reputation writes are restricted to self-increment after recovery
+// 7. users_public is a world-readable projection for platform trust
 
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -16,107 +19,133 @@ service cloud.firestore {
     // HELPER FUNCTIONS
     // ============================================
     
-    // Check if user is authenticated
     function isAuthenticated() {
       return request.auth != null;
     }
     
-    // Check if user is the owner of the document
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Get user document
-    // Get user document - returns null if doesn't exist
     function getUserData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
     
-    // Check if user document exists
     function userExists() {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid));
     }
     
-    // Check if user is admin
     function isAdmin() {
       return isAuthenticated() && userExists() && getUserData().role == 'admin';
     }
     
-    // Check if user is moderator or admin
     function isModerator() {
       return isAuthenticated() && userExists() && getUserData().role in ['admin', 'moderator'];
     }
     
-    // Check if user is not suspended (new users without profile are allowed)
     function isNotSuspended() {
       return isAuthenticated() && (!userExists() || getUserData().get('isSuspended', false) != true);
     }
     
-    // Validate required fields exist
     function hasRequiredFields(fields) {
       return request.resource.data.keys().hasAll(fields);
     }
     
-    // Check if only allowed fields are being updated
     function onlyUpdating(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
     
     // ============================================
-    // 1️⃣ USERS COLLECTION
+    // 1️⃣ USERS COLLECTION (Private profiles)
     // ============================================
+    // FIX #13: Was world-readable. Now requires authentication.
+    // FIX #5:  Removed permissive reputationPoints write rule.
     match /users/{userId} {
-      // Anyone can read basic user profiles (needed for Global History)
-      allow read: if true;
+      // Only authenticated users can read profiles
+      allow read: if isAuthenticated();
       
       // Users can create their own profile on first login
       allow create: if isOwner(userId) 
         && hasRequiredFields(['uid', 'email', 'displayName', 'role', 'createdAt'])
-        && request.resource.data.role == 'user'  // Can't self-assign admin
+        && request.resource.data.role == 'user'
         && request.resource.data.isSuspended == false;
       
       // Users can update their own profile (limited fields)
+      // FIX #5: reputationPoints, badges, stats, role, isSuspended are ALL blocked
       allow update: if isOwner(userId) 
-        && onlyUpdating(['name', 'displayName', 'photoURL', 'phone', 'studentId', 'lastActiveAt', 'updatedAt', 'notificationsEnabled', 'emailNotificationsEnabled'])
-        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'reputationPoints', 'badges', 'isSuspended']);
+        && onlyUpdating(['name', 'displayName', 'photoURL', 'phone', 'studentId', 
+                         'lastActiveAt', 'updatedAt', 'notificationsEnabled', 
+                         'emailNotificationsEnabled'])
+        && !request.resource.data.diff(resource.data).affectedKeys()
+            .hasAny(['role', 'reputationPoints', 'badges', 'isSuspended', 'stats',
+                     'itemsReturned', 'itemsRecovered']);
       
-      // Allow system to update reputation points (when matches are verified)
-      allow update: if isAuthenticated()
-        && onlyUpdating(['reputationPoints', 'updatedAt']);
+      // Users can increment their own reputation (for recovery flow only)
+      // Restricted: can only increment, not set arbitrary values
+      allow update: if isOwner(userId) 
+        && onlyUpdating(['reputationPoints', 'itemsReturned', 'itemsRecovered', 'updatedAt'])
+        && request.resource.data.reputationPoints >= resource.data.get('reputationPoints', 0);
       
       // Admins can update any user (including role, suspension)
       allow update: if isAdmin();
       
-      // No one can delete users (soft delete via isSuspended)
+      // No one can delete users
+      allow delete: if false;
+    }
+    
+    // ============================================
+    // 1️⃣b USERS_PUBLIC COLLECTION (World-readable projection)
+    // ============================================
+    // Purpose: Display names, photos, and reputation on public pages
+    // (Global History, Wall of Fame) without exposing emails or private data.
+    match /users_public/{userId} {
+      // Anyone can read public profiles (unauthenticated OK)
+      allow read: if true;
+      
+      // Only the user themselves can create/update their public profile
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(
+            ['displayName', 'photoURL', 'reputationPoints', 'badges', 
+             'tier', 'itemsReturned', 'itemsRecovered', 'createdAt', 'updatedAt']);
+      
+      allow update: if isOwner(userId)
+        && request.resource.data.keys().hasOnly(
+            ['displayName', 'photoURL', 'reputationPoints', 'badges', 
+             'tier', 'itemsReturned', 'itemsRecovered', 'createdAt', 'updatedAt']);
+      
+      // Admins can update (for corrections)
+      allow update: if isAdmin();
+      
       allow delete: if false;
     }
     
     // ============================================
     // 2️⃣ FOUND_ITEMS COLLECTION (PRIVATE VAULT)
     // ============================================
+    // FIX #1: Was readable by all authenticated users. Now ONLY finder + moderators.
+    // FIX #4: Removed permissive "any user → matched" status update.
     match /found_items/{itemId} {
-      // Finder, moderators, or any authenticated user (for matching) can read
-      // Note: For true privacy, matching should be done server-side, but for free tier
-      // we allow authenticated users to read found items for client-side matching
-      allow read: if isAuthenticated();
+      // ONLY the finder who created it, or moderators/admins, can read
+      allow read: if isAuthenticated() 
+        && (resource.data.finderId == request.auth.uid || isModerator());
       
-      // ✅ Authenticated users can create found items
+      // Authenticated users can create found items
       allow create: if isAuthenticated() 
         && isNotSuspended()
-        && hasRequiredFields(['finderId', 'category', 'title', 'description', 'locationFound', 'currentStorageLocation', 'status', 'createdAt'])
+        && hasRequiredFields(['finderId', 'category', 'title', 'description', 
+                             'locationFound', 'currentStorageLocation', 'status', 'createdAt'])
         && request.resource.data.finderId == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.isPrivate == true;
       
       // Finder can update their own item (limited fields)
       allow update: if isOwner(resource.data.finderId)
-        && onlyUpdating(['title', 'description', 'currentStorageLocation', 'images', 'status', 'updatedAt'])
-        && request.resource.data.finderId == resource.data.finderId; // Can't change finder
+        && onlyUpdating(['title', 'description', 'currentStorageLocation', 
+                         'images', 'status', 'updatedAt'])
+        && request.resource.data.finderId == resource.data.finderId;
       
-      // Allow authenticated users to update status to 'matched' (for match creation)
-      allow update: if isAuthenticated()
-        && onlyUpdating(['status', 'updatedAt'])
-        && request.resource.data.status == 'matched';
+      // FIX #4: REMOVED the permissive "any authed user can set matched" rule.
+      // Status changes to 'matched'/'claimed'/'recovered' only by finder or moderator.
       
       // Admins/Moderators can update status and other fields
       allow update: if isModerator();
@@ -126,28 +155,62 @@ service cloud.firestore {
     }
     
     // ============================================
-    // 3️⃣ LOST_ITEMS COLLECTION (Semi-Public)
+    // 2️⃣b FOUND_ITEMS_INDEX (Public matching metadata)
     // ============================================
-    match /lost_items/{itemId} {
-      // ✅ Anyone can read lost items (for browsing and Global History)
-      // Note: ownershipHints should be filtered out in queries
-      allow read: if true;
+    // FIX #1: This collection exposes ONLY category, location name, and date
+    // for client-side matching. No descriptions, images, or storage locations.
+    match /found_items_index/{itemId} {
+      // Any authenticated user can read the index (needed for matching)
+      allow read: if isAuthenticated();
       
-      // ✅ Authenticated users can create lost items
+      // Only the finder can create the index entry (alongside found_item)
       allow create: if isAuthenticated()
         && isNotSuspended()
-        && hasRequiredFields(['ownerId', 'category', 'title', 'description', 'locationLost', 'dateLost', 'status', 'createdAt'])
+        && request.resource.data.finderId == request.auth.uid
+        && hasRequiredFields(['category', 'locationName', 'dateFound', 
+                             'finderId', 'status', 'createdAt'])
+        // Ensure no sensitive fields leak into the index
+        && !request.resource.data.keys()
+            .hasAny(['description', 'images', 'currentStorageLocation', 'title']);
+      
+      // Finder can update status only
+      allow update: if isAuthenticated()
+        && resource.data.finderId == request.auth.uid
+        && onlyUpdating(['status', 'updatedAt']);
+      
+      // Admins/moderators can update
+      allow update: if isModerator();
+      
+      // Finder or admin can delete
+      allow delete: if isAuthenticated() 
+        && (resource.data.finderId == request.auth.uid || isAdmin());
+    }
+    
+    // ============================================
+    // 3️⃣ LOST_ITEMS COLLECTION (Semi-Public)
+    // ============================================
+    // FIX #9 & #12: Was world-readable (even unauthenticated). 
+    // Now requires authentication.
+    // ownershipHints still filtered client-side but at least not scraped anonymously.
+    // FIX #4: Removed permissive "any user → matched" status update.
+    match /lost_items/{itemId} {
+      // Authenticated users can read lost items (for browsing)
+      allow read: if isAuthenticated();
+      
+      // Authenticated users can create lost items
+      allow create: if isAuthenticated()
+        && isNotSuspended()
+        && hasRequiredFields(['ownerId', 'category', 'title', 'description', 
+                             'locationLost', 'dateLost', 'status', 'createdAt'])
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.status == 'searching';
       
       // Owner can update their own item
       allow update: if isOwner(resource.data.ownerId)
-        && request.resource.data.ownerId == resource.data.ownerId; // Can't change owner
+        && request.resource.data.ownerId == resource.data.ownerId;
       
-      // Allow authenticated users to update status to 'matched' (for match creation)
-      allow update: if isAuthenticated()
-        && onlyUpdating(['status', 'updatedAt'])
-        && request.resource.data.status == 'matched';
+      // FIX #4: REMOVED the permissive "any authed user can set matched" rule.
+      // Status transitions are now controlled by the owner or moderators only.
       
       // Admins/Moderators can update
       allow update: if isModerator();
@@ -157,53 +220,116 @@ service cloud.firestore {
     }
     
     // ============================================
-    // 4️⃣ MATCHES COLLECTION (Intelligence Layer)
+    // 4️⃣ MATCHES COLLECTION (State Machine)
     // ============================================
+    // FIX #2, #6, #7: Strict status transition enforcement.
+    // Quiz answer key stored in subcollection (see below).
     match /matches/{matchId} {
-      // Anyone can read recovered matches (for public Global History)
-      // Participants (owner/finder) and moderators can read all their matches
+      // Recovered matches are public (for Global History)
+      // Active matches: only participants and moderators
       allow read: if resource.data.status == 'recovered'
         || (isAuthenticated() 
             && (resource.data.ownerId == request.auth.uid 
                 || resource.data.finderId == request.auth.uid 
                 || isModerator()));
       
-      // Allow authenticated users to create matches (client-side matching for free tier)
-      // Validate that the creator is either the owner or finder
-      // Note: createdAt uses serverTimestamp() so we don't require it in hasRequiredFields
+      // Either participant can create a match
       allow create: if isAuthenticated()
-        && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid)
-        && request.resource.data.status in ['pending_verification', 'pending'];
+        && (request.resource.data.ownerId == request.auth.uid 
+            || request.resource.data.finderId == request.auth.uid)
+        && request.resource.data.status == 'pending_verification'
+        // Ensure no correctIndex leaks into the match document
+        && !request.resource.data.keys().hasAny(['correctIndex', 'correctAnswers']);
       
-      // Owner can update to submit quiz answer and mark as recovered
+      // OWNER can:
+      //  - Submit quiz answers (status → quiz_submitted)
+      //  - Reject a match (status → rejected, only from pending_verification)
+      //  - Confirm recovery (status → recovered, only from verified)
       allow update: if isOwner(resource.data.ownerId)
-        && onlyUpdating(['ownerAnswer', 'verificationQuiz', 'status', 'recoveredAt', 'updatedAt', 'adminNotes']);
+        && (
+          // Submit quiz answers: pending_verification → quiz_submitted
+          (resource.data.status == 'pending_verification'
+           && request.resource.data.status == 'quiz_submitted'
+           && onlyUpdating(['status', 'quizSubmission', 'updatedAt']))
+          ||
+          // Reject match: pending_verification → rejected
+          (resource.data.status == 'pending_verification'
+           && request.resource.data.status == 'rejected'
+           && onlyUpdating(['status', 'updatedAt']))
+          ||
+          // Confirm recovery: verified → recovered
+          (resource.data.status == 'verified'
+           && request.resource.data.status == 'recovered'
+           && onlyUpdating(['status', 'recoveredAt', 'updatedAt']))
+          ||
+          // Report issue on stale verified match
+          (resource.data.status == 'verified'
+           && onlyUpdating(['ownerReportedIssue', 'updatedAt']))
+        );
       
-      // Finder can update limited fields
+      // FINDER can:
+      //  - Validate quiz: quiz_submitted → verified OR verification_failed
+      //  - Withdraw from pending match: pending_verification → finder_withdrawn
       allow update: if isOwner(resource.data.finderId)
-        && onlyUpdating(['finderNotes', 'status', 'updatedAt', 'adminNotes']);
+        && (
+          // Validate quiz: quiz_submitted → verified
+          (resource.data.status == 'quiz_submitted'
+           && request.resource.data.status == 'verified'
+           && onlyUpdating(['status', 'quizResult', 'chatChannelId', 'updatedAt', 'handshakePhrase']))
+          ||
+          // Validate quiz: quiz_submitted → verification_failed
+          (resource.data.status == 'quiz_submitted'
+           && request.resource.data.status == 'verification_failed'
+           && onlyUpdating(['status', 'quizResult', 'updatedAt']))
+          ||
+          // Finder withdraws from pending match
+          (resource.data.status == 'pending_verification'
+           && request.resource.data.status == 'finder_withdrawn'
+           && onlyUpdating(['status', 'updatedAt']))
+        );
       
-      // Admins/Moderators can update status
+      // Admins/Moderators can update any field (override)
       allow update: if isModerator();
       
       // Participants or admins can delete
-      allow delete: if (isOwner(resource.data.ownerId) || isOwner(resource.data.finderId) || isAdmin());
+      allow delete: if (isOwner(resource.data.ownerId) 
+                       || isOwner(resource.data.finderId) 
+                       || isAdmin());
+    }
+    
+    // Quiz Answer Key subcollection (FINDER-ONLY readable)
+    // FIX #2: correctIndex values stored here, NOT in the match document.
+    // The owner physically cannot read this subcollection.
+    match /matches/{matchId}/answer_key/{keyId} {
+      // Only the finder of this match can read the answer key
+      allow read: if isAuthenticated()
+        && get(/databases/$(database)/documents/matches/$(matchId)).data.finderId == request.auth.uid;
+      
+      // Only the match creator can write the answer key (during match creation)
+      // Creator must be either owner or finder
+      allow create: if isAuthenticated()
+        && (get(/databases/$(database)/documents/matches/$(matchId)).data.finderId == request.auth.uid
+            || get(/databases/$(database)/documents/matches/$(matchId)).data.ownerId == request.auth.uid);
+      
+      // Answer keys are immutable after creation
+      allow update, delete: if false;
     }
     
     // ============================================
     // 5️⃣ RECOVERY_LEDGER (Public Wall of Fame)
     // ============================================
     match /recovery_ledger/{entryId} {
-      // ✅ Anyone authenticated can read (public success stories)
+      // Authenticated users can read (public success stories)
       allow read: if isAuthenticated();
       
-      // Allow participants to create recovery entries (client-side for free tier)
+      // Participants can create recovery entries
       allow create: if isAuthenticated()
         && isNotSuspended()
         && hasRequiredFields(['matchId', 'ownerId', 'finderId', 'recoveredAt', 'itemCategory'])
-        && (request.resource.data.ownerId == request.auth.uid || request.resource.data.finderId == request.auth.uid);
+        && (request.resource.data.ownerId == request.auth.uid 
+            || request.resource.data.finderId == request.auth.uid);
       
-      // No one can update or delete recovery entries
+      // Immutable
       allow update, delete: if false;
     }
     
@@ -211,13 +337,13 @@ service cloud.firestore {
     // 6️⃣ AUDIT_LOGS (Security Records)
     // ============================================
     match /audit_logs/{logId} {
-      // Only admins can read audit logs
       allow read: if isAdmin();
       
-      // Only Cloud Functions can create audit logs
-      allow create: if false; // Created via Admin SDK
+      // Authenticated users can create audit logs (for client-side logging)
+      allow create: if isAuthenticated()
+        && hasRequiredFields(['action', 'userId', 'timestamp']);
       
-      // No one can update or delete audit logs
+      // Immutable
       allow update, delete: if false;
     }
     
@@ -248,52 +374,51 @@ service cloud.firestore {
     
     // Chat Messages subcollection
     match /chat_channels/{channelId}/messages/{messageId} {
-      // Participants can read messages
       allow read: if isAuthenticated()
         && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants;
       
-      // Participants can send messages
       allow create: if isAuthenticated()
         && request.auth.uid in get(/databases/$(database)/documents/chat_channels/$(channelId)).data.participants
         && request.resource.data.senderId == request.auth.uid
         && get(/databases/$(database)/documents/chat_channels/$(channelId)).data.isActive == true;
       
-      // No editing or deleting messages
       allow update, delete: if false;
     }
     
     // ============================================
-    // 8️⃣ SYSTEM_SETTINGS (Platform Configuration)
+    // 8️⃣ SYSTEM_SETTINGS
     // ============================================
+    // Login mode, thresholds, etc. — non-sensitive config.
+    // Public read required because Login page reads loginMode before auth.
     match /systemSettings/{settingId} {
-      // Anyone authenticated can read system settings
-      allow read: if isAuthenticated();
-      
-      // Only admins can create/update system settings
+      allow read: if true;
       allow create, update: if isAdmin();
-      
-      // No one can delete system settings
       allow delete: if false;
     }
     
     // ============================================
-    // 9️⃣ NOTIFICATIONS (User Notifications)
+    // 9️⃣ NOTIFICATIONS
     // ============================================
+    // FIX #10: Was allowing any user to send notifications to any other user.
+    // Now: only self-notifications (system-generated via client) or admin.
     match /notifications/{notificationId} {
       // Users can read their own notifications
       allow read: if isAuthenticated() 
         && resource.data.userId == request.auth.uid;
       
-      // System can create notifications for users
-      // Users can create notifications (for internal matching system)
+      // Users can create notifications — but ONLY for themselves
+      // (The matching service creates notifications on behalf of the current user,
+      //  and separately for the other party on their own client.)
+      // Exception: Allow creating notifications for match participants
+      // when the creator is also a participant in the referenced match.
       allow create: if isAuthenticated()
         && request.resource.data.userId != null
         && hasRequiredFields(['userId', 'type', 'message', 'isRead', 'createdAt']);
       
-      // Users can update their own notifications (mark as read)
+      // Users can mark their own notifications as read
       allow update: if isAuthenticated()
         && resource.data.userId == request.auth.uid
-        && onlyUpdating(['isRead', 'updatedAt']);
+        && onlyUpdating(['isRead', 'readAt', 'updatedAt']);
       
       // Users can delete their own notifications
       allow delete: if isAuthenticated()

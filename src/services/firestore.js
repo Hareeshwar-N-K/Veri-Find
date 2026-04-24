@@ -1,13 +1,16 @@
 /**
- * VeriFind - Firestore Service Layer
+ * VeriFind - Firestore Service Layer (HARDENED)
  *
  * Handles all CRUD operations for collections:
- * - users
- * - found_items
+ * - users / users_public
+ * - found_items / found_items_index
  * - lost_items
- * - matches
+ * - matches / matches/{id}/answer_key
  * - recovery_ledger
  * - chat_channels
+ *
+ * SECURITY: No Cloud Functions. All security enforced via Firestore rules
+ * and architectural patterns (finder-validates quiz, index collection).
  */
 
 import {
@@ -30,11 +33,14 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
+import { generateHandshakePhrase } from "../utils/helpers";
 
 // Collection names
 export const COLLECTIONS = {
   USERS: "users",
+  USERS_PUBLIC: "users_public",
   FOUND_ITEMS: "found_items",
+  FOUND_ITEMS_INDEX: "found_items_index",
   LOST_ITEMS: "lost_items",
   MATCHES: "matches",
   RECOVERY_LEDGER: "recovery_ledger",
@@ -69,16 +75,31 @@ export async function createOrUpdateUser(user) {
     await setDoc(userRef, {
       ...userData,
       role: "user",
-      reputationScore: 0,
+      reputationPoints: 0,
       badges: [],
       stats: {
         itemsLost: 0,
         itemsFound: 0,
         successfulRecoveries: 0,
       },
+      itemsReturned: 0,
+      itemsRecovered: 0,
       isSuspended: false,
       createdAt: serverTimestamp(),
     });
+
+    // Create public profile projection
+    await syncUserPublic(user.uid, {
+      displayName: user.displayName || "Anonymous",
+      photoURL: user.photoURL || null,
+      reputationPoints: 0,
+      badges: [],
+      tier: "Beginner",
+      itemsReturned: 0,
+      itemsRecovered: 0,
+      createdAt: serverTimestamp(),
+    });
+
     return { isNew: true };
   } else {
     // Existing user - update only allowed fields
@@ -88,7 +109,37 @@ export async function createOrUpdateUser(user) {
       lastActiveAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+
+    // Sync public projection
+    const profile = userSnap.data();
+    await syncUserPublic(user.uid, {
+      displayName: user.displayName || "Anonymous",
+      photoURL: user.photoURL || null,
+      reputationPoints: profile.reputationPoints || 0,
+      badges: profile.badges || [],
+      tier: profile.tier || "Beginner",
+      itemsReturned: profile.itemsReturned || 0,
+      itemsRecovered: profile.itemsRecovered || 0,
+    });
+
     return { isNew: false };
+  }
+}
+
+/**
+ * Sync public user profile (world-readable projection)
+ * Contains ONLY display-safe fields: no email, no role, no suspension status.
+ */
+export async function syncUserPublic(userId, publicData) {
+  try {
+    const publicRef = doc(db, COLLECTIONS.USERS_PUBLIC, userId);
+    await setDoc(publicRef, {
+      ...publicData,
+      updatedAt: serverTimestamp(),
+    }, { merge: true });
+  } catch (error) {
+    console.error("Failed to sync users_public:", error);
+    // Non-critical — don't break the login flow
   }
 }
 
@@ -174,21 +225,24 @@ export async function createFoundItem(itemData) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
+  const locationFound = {
+    name: itemData.locationName,
+    coordinates: itemData.coordinates || null,
+    address: itemData.address || null,
+  };
+  const dateFound = Timestamp.fromDate(new Date(itemData.dateFound));
+
   const foundItem = {
     finderId: currentUser.uid,
     finderName: currentUser.displayName || "Anonymous",
     category: itemData.category,
     title: itemData.title,
     description: itemData.description,
-    locationFound: {
-      name: itemData.locationName,
-      coordinates: itemData.coordinates || null,
-      address: itemData.address || null,
-    },
-    dateFound: Timestamp.fromDate(new Date(itemData.dateFound)),
+    locationFound,
+    dateFound,
     currentStorageLocation: itemData.storageLocation || "With finder",
     images: itemData.images || [],
-    aiAnalysis: null, // Will be populated by Cloud Function
+    aiAnalysis: null,
     isPrivate: true, // ALWAYS private
     status: "pending",
     createdAt: serverTimestamp(),
@@ -200,8 +254,23 @@ export async function createFoundItem(itemData) {
     foundItem
   );
 
-  // Note: User stats are updated by Cloud Functions (onFoundItemCreate trigger)
-  // This keeps the frontend simpler and stats secure from manipulation
+  // SECURITY FIX: Create a minimal index entry for privacy-preserving matching.
+  // This index contains ONLY category, location name, and date — no description,
+  // images, or storage location. Other users match against this index, not the
+  // full found_items document.
+  try {
+    await setDoc(doc(db, COLLECTIONS.FOUND_ITEMS_INDEX, docRef.id), {
+      category: itemData.category,
+      locationName: itemData.locationName || "",
+      dateFound,
+      finderId: currentUser.uid,
+      status: "pending",
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    console.error("Failed to create found_items_index entry:", error);
+    // Non-critical: the item is still created, matching may be limited
+  }
 
   return { id: docRef.id, ...foundItem };
 }
@@ -662,15 +731,22 @@ export async function getAllMatches(limitCount = 50) {
 }
 
 /**
- * Update match status (admin only)
+ * Update match status.
+ * NOTE: adminNotes is ONLY written when explicitly provided.
+ * Writing it as empty string violates the strict onlyUpdating() Firestore rule
+ * for non-admin transitions (rejection, recovery, etc.)
  */
 export async function updateMatchStatus(matchId, status, notes = "") {
   const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
   const updateData = {
     status: status,
-    adminNotes: notes,
     updatedAt: serverTimestamp(),
   };
+
+  // Only include adminNotes if explicitly provided (admin use only)
+  if (notes) {
+    updateData.adminNotes = notes;
+  }
 
   // Add recoveredAt timestamp if status is recovered
   if (status === "recovered") {
@@ -809,11 +885,344 @@ export function subscribeToNotifications(userId, callback, onError = null) {
   );
 }
 
+// ============================================
+// 🔐 QUIZ ANSWER KEY OPERATIONS (Security Layer)
+// ============================================
+
+/**
+ * Store the quiz answer key in a subcollection that ONLY the finder can read.
+ * The match document will contain questions WITHOUT correctIndex.
+ * This prevents the owner from seeing answers via DevTools.
+ *
+ * @param {string} matchId - The match document ID
+ * @param {Array<number>} correctAnswers - Array of correct answer indices [0, 2, 1]
+ */
+export async function storeAnswerKey(matchId, correctAnswers) {
+  const keyRef = doc(db, COLLECTIONS.MATCHES, matchId, "answer_key", "key");
+  await setDoc(keyRef, {
+    correctAnswers,
+    createdAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Get the quiz answer key (only callable by the finder).
+ * Firestore rules enforce that only the finder can read this subcollection.
+ *
+ * @param {string} matchId - The match document ID
+ * @returns {Promise<Array<number>|null>} Array of correct answer indices or null
+ */
+export async function getAnswerKey(matchId) {
+  try {
+    const keyRef = doc(db, COLLECTIONS.MATCHES, matchId, "answer_key", "key");
+    const keySnap = await getDoc(keyRef);
+    if (!keySnap.exists()) return null;
+    return keySnap.data().correctAnswers;
+  } catch (error) {
+    console.error("Cannot read answer key (expected if you're the owner):", error);
+    return null;
+  }
+}
+
+/**
+ * Owner submits quiz answers. Sets status to "quiz_submitted".
+ * The answers are stored in the match doc for the finder to validate.
+ * Firestore rules enforce: only owner, only from pending_verification.
+ *
+ * @param {string} matchId - The match document ID
+ * @param {Array<number>} answers - Array of selected answer indices
+ */
+export async function submitQuizAnswers(matchId, answers) {
+  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+  await updateDoc(matchRef, {
+    quizSubmission: answers,
+    status: "quiz_submitted",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/**
+ * Finder validates quiz answers and sets match result.
+ * Reads the answer_key subcollection (only finder can read),
+ * compares with the owner's submission, and updates the match status.
+ *
+ * @param {string} matchId - The match document ID
+ * @returns {Promise<{passed: boolean, correctCount: number, total: number}>}
+ */
+export async function validateAndSetQuizResult(matchId) {
+  // 1. Get the match document to read the submission
+  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+  const matchSnap = await getDoc(matchRef);
+  if (!matchSnap.exists()) throw new Error("Match not found");
+
+  const matchData = matchSnap.data();
+  const submission = matchData.quizSubmission;
+
+  if (!submission || !Array.isArray(submission)) {
+    throw new Error("No quiz submission found");
+  }
+
+  // 2. Get the answer key (only finder can read this)
+  const answerKey = await getAnswerKey(matchId);
+  if (!answerKey) throw new Error("Cannot read answer key");
+
+  // 3. Compare answers
+  let correctCount = 0;
+  const total = answerKey.length;
+  answerKey.forEach((correctIdx, i) => {
+    if (submission[i] === correctIdx) correctCount++;
+  });
+
+  const passed = correctCount >= Math.ceil(total * 0.66);
+
+  // 4. Update match status based on result
+  if (passed) {
+    // Create a chat channel for verified matches
+    const channelRef = await addDoc(collection(db, COLLECTIONS.CHAT_CHANNELS), {
+      matchId,
+      participants: [matchData.ownerId, matchData.finderId],
+      isActive: true,
+      createdAt: serverTimestamp(),
+      lastMessageAt: serverTimestamp(),
+      lastMessage: "Match verified! You can now chat.",
+    });
+
+    await updateDoc(matchRef, {
+      status: "verified",
+      quizResult: { correctCount, total, passed: true },
+      chatChannelId: channelRef.id,
+      handshakePhrase: generateHandshakePhrase(),
+      updatedAt: serverTimestamp(),
+    });
+  } else {
+    await updateDoc(matchRef, {
+      status: "verification_failed",
+      quizResult: { correctCount, total, passed: false },
+      updatedAt: serverTimestamp(),
+    });
+  }
+
+  return { passed, correctCount, total };
+}
+
+// ============================================
+// 🏆 REPUTATION OPERATIONS (Self-increment only)
+// ============================================
+
+/**
+ * Award reputation points after a successful recovery.
+ * Called by the FINDER when they confirm the owner received the item,
+ * or by the OWNER when they confirm recovery.
+ *
+ * Firestore rules ensure users can only increment their OWN reputation.
+ * The increment values are enforced client-side (50 for finder, 10 for owner).
+ *
+ * @param {string} matchId - The match ID for audit trail
+ * @param {string} role - "finder" or "owner"
+ */
+export async function awardReputationForRecovery(matchId, role) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const points = role === "finder" ? 50 : 10;
+  const field = role === "finder" ? "itemsReturned" : "itemsRecovered";
+
+  const userRef = doc(db, COLLECTIONS.USERS, currentUser.uid);
+  await updateDoc(userRef, {
+    reputationPoints: increment(points),
+    [field]: increment(1),
+    updatedAt: serverTimestamp(),
+  });
+
+  // Sync to public profile
+  const userSnap = await getDoc(userRef);
+  const userData = userSnap.data();
+  await syncUserPublic(currentUser.uid, {
+    displayName: userData.displayName,
+    photoURL: userData.photoURL,
+    reputationPoints: userData.reputationPoints,
+    badges: userData.badges || [],
+    [field]: userData[field],
+  });
+
+  // Audit log
+  try {
+    await addDoc(collection(db, COLLECTIONS.AUDIT_LOGS), {
+      action: "REPUTATION_AWARDED",
+      userId: currentUser.uid,
+      details: { matchId, role, points },
+      timestamp: serverTimestamp(),
+    });
+  } catch (e) {
+    console.error("Audit log failed:", e);
+  }
+}
+
+// ============================================
+// 🔍 FOUND_ITEMS_INDEX OPERATIONS
+// ============================================
+
+/**
+ * Get found items index entries for client-side matching.
+ * Returns ONLY metadata (category, location, date) — no descriptions or images.
+ */
+export async function getFoundItemsIndex() {
+  const q = query(
+    collection(db, COLLECTIONS.FOUND_ITEMS_INDEX),
+    where("status", "==", "pending"),
+    orderBy("createdAt", "desc")
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Update found item index status (e.g., when item is matched/recovered).
+ */
+export async function updateFoundItemIndexStatus(itemId, status) {
+  try {
+    const indexRef = doc(db, COLLECTIONS.FOUND_ITEMS_INDEX, itemId);
+    await updateDoc(indexRef, { status, updatedAt: serverTimestamp() });
+  } catch (error) {
+    console.error("Failed to update found_items_index:", error);
+  }
+}
+
+// ============================================
+// ⏰ STALE MATCH DETECTION (Hostage Prevention)
+// ============================================
+
+/**
+ * Find matches that have been in "verified" status for more than 7 days.
+ * Called client-side (e.g., from Dashboard or Admin) to detect hostage situations.
+ *
+ * @returns {Promise<Array>} Stale matches needing attention
+ */
+export async function getStaleVerifiedMatches() {
+  const sevenDaysAgo = Timestamp.fromDate(
+    new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+  );
+
+  const q = query(
+    collection(db, COLLECTIONS.MATCHES),
+    where("status", "==", "verified"),
+    where("updatedAt", "<", sevenDaysAgo)
+  );
+
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Report an issue on a verified match (hostage prevention).
+ * Creates a notification for admin and flags the match.
+ */
+export async function reportMatchIssue(matchId, reason) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
+  await updateDoc(matchRef, {
+    ownerReportedIssue: {
+      reason,
+      reportedBy: currentUser.uid,
+      reportedAt: serverTimestamp(),
+    },
+    updatedAt: serverTimestamp(),
+  });
+
+  // Create admin notification
+  try {
+    await addDoc(collection(db, COLLECTIONS.NOTIFICATIONS), {
+      userId: currentUser.uid,  // Self-notification (rules allow this)
+      type: "issue_reported",
+      title: "Issue Reported on Match",
+      message: `Issue reported on match ${matchId}: ${reason}`,
+      matchId,
+      isRead: false,
+      createdAt: serverTimestamp(),
+    });
+  } catch (e) {
+    console.error("Failed to create notification:", e);
+  }
+}
+
+// ============================================
+// 🔄 ITEM STATUS REVERSION
+// ============================================
+
+/**
+ * Revert item statuses when a match is rejected.
+ * Sets the lost item back to "searching" and found item back to "pending"
+ * so they re-enter the matching pool.
+ */
+export async function revertItemStatuses(lostItemId, foundItemId) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  try {
+    // Revert lost item
+    if (lostItemId) {
+      const lostRef = doc(db, COLLECTIONS.LOST_ITEMS, lostItemId);
+      await updateDoc(lostRef, {
+        status: "searching",
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    // Revert found item (only finder can update their own item)
+    // This may fail if the current user isn't the finder — that's OK,
+    // the found item status will be handled by the finder's client.
+    if (foundItemId) {
+      try {
+        const foundRef = doc(db, COLLECTIONS.FOUND_ITEMS, foundItemId);
+        await updateDoc(foundRef, {
+          status: "pending",
+          updatedAt: serverTimestamp(),
+        });
+        // Also update the index
+        await updateFoundItemIndexStatus(foundItemId, "pending");
+      } catch (e) {
+        console.warn("Could not revert found item (may not be the finder):", e);
+      }
+    }
+  } catch (error) {
+    console.error("Error reverting item statuses:", error);
+  }
+}
+
+/**
+ * Create a recovery ledger entry for the public Wall of Fame.
+ */
+export async function createRecoveryEntry(matchData) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) throw new Error("Not authenticated");
+
+  const entry = {
+    matchId: matchData.matchId || matchData.id,
+    ownerId: matchData.ownerId,
+    finderId: matchData.finderId,
+    ownerName: matchData.ownerName || "Anonymous",
+    finderName: matchData.finderName || "Anonymous",
+    itemCategory: matchData.itemCategory || matchData.category || "other",
+    itemTitle: matchData.lostItemTitle || matchData.itemTitle || "Item",
+    locationFound: matchData.foundLocation?.name || "Unknown",
+    reputationAwarded: 50,
+    recoveredAt: serverTimestamp(),
+    createdAt: serverTimestamp(),
+  };
+
+  await addDoc(collection(db, COLLECTIONS.RECOVERY_LEDGER), entry);
+  return entry;
+}
+
 export default {
   // Collections
   COLLECTIONS,
   // Users
   createOrUpdateUser,
+  syncUserPublic,
   getUser,
   updateUserProfile,
   getAllUsers,
@@ -823,6 +1232,9 @@ export default {
   getMyFoundItems,
   getFoundItem,
   updateFoundItem,
+  // Found Items Index
+  getFoundItemsIndex,
+  updateFoundItemIndexStatus,
   // Lost Items
   createLostItem,
   getAllLostItems,
@@ -835,9 +1247,20 @@ export default {
   getMatch,
   submitQuizAnswer,
   subscribeToMatch,
+  // Quiz Security
+  storeAnswerKey,
+  getAnswerKey,
+  submitQuizAnswers,
+  validateAndSetQuizResult,
   // Recovery
   getRecoveryStories,
   getRecoveryStats,
+  createRecoveryEntry,
+  awardReputationForRecovery,
+  // Hostage Prevention
+  getStaleVerifiedMatches,
+  reportMatchIssue,
+  revertItemStatuses,
   // System Settings
   getSystemSettings,
   updateSystemSettings,

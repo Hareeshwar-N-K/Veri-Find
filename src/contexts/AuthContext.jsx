@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }) => {
 
       if (user) {
         try {
-          // Create or update user in Firestore
+          // Create or update user in Firestore (also syncs users_public)
           await createOrUpdateUser(user);
 
           // Get full user profile from database
@@ -33,22 +33,16 @@ export const AuthProvider = ({ children }) => {
           setUserProfile(profile);
 
           // Check if user is admin from database role
+          // SECURITY FIX: No localStorage caching — admin status comes
+          // exclusively from the Firestore document on every session.
           const isUserAdmin = profile?.role === "admin";
           setIsAdmin(isUserAdmin);
-
-          // Store admin status in localStorage for quick access
-          if (isUserAdmin) {
-            localStorage.setItem("isAdmin", "true");
-          } else {
-            localStorage.removeItem("isAdmin");
-          }
         } catch (error) {
           console.error("Error syncing user profile:", error);
         }
       } else {
         setUserProfile(null);
         setIsAdmin(false);
-        localStorage.removeItem("isAdmin");
       }
 
       setLoading(false);
@@ -62,7 +56,6 @@ export const AuthProvider = ({ children }) => {
       await signOut(auth);
       setUserProfile(null);
       setIsAdmin(false);
-      localStorage.removeItem("isAdmin");
     } catch (error) {
       console.error("Logout error:", error);
     }
@@ -76,12 +69,6 @@ export const AuthProvider = ({ children }) => {
       // Update admin status from refreshed profile
       const isUserAdmin = profile?.role === "admin";
       setIsAdmin(isUserAdmin);
-
-      if (isUserAdmin) {
-        localStorage.setItem("isAdmin", "true");
-      } else {
-        localStorage.removeItem("isAdmin");
-      }
     }
   };
 

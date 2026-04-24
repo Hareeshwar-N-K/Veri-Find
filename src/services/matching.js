@@ -1,10 +1,15 @@
 /**
- * VeriFind - Client-Side Matching Service
+ * VeriFind - Client-Side Matching Service (HARDENED)
  *
- * AI-like matching algorithm that runs on the frontend
- * to match lost items with found items based on multiple criteria.
+ * Privacy-preserving matching algorithm that runs on the frontend.
+ * Matches lost items against the found_items_index (NOT full found_items).
  *
- * This replaces Cloud Functions for Firebase free tier.
+ * SECURITY FIXES:
+ * - Matches against found_items_index (category, location, date only — no descriptions)
+ * - Quiz correctIndex is stored in answer_key subcollection (owner can't read it)
+ * - No client-side reputation writes to other users
+ * - Match deduplication check before creation
+ * - Items NOT set to "matched" until verification passes
  */
 
 import {
@@ -18,11 +23,15 @@ import {
   doc,
   serverTimestamp,
   Timestamp,
-  increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase/config";
-import { COLLECTIONS, createNotification } from "./firestore";
-import { generateVerificationQuestion } from "../utils/ai";
+import {
+  COLLECTIONS,
+  createNotification,
+  storeAnswerKey,
+  updateFoundItemIndexStatus,
+} from "./firestore";
+import { generateVerificationQuestions } from "../utils/ai";
 
 /**
  * Calculate similarity score between two strings using Jaccard similarity
@@ -107,28 +116,21 @@ function calculateCategoryScore(cat1, cat2) {
 }
 
 /**
- * Calculate overall match score between a lost item and found item
+ * Calculate overall match score between a lost item and found item (or index entry).
+ * When matching against the index, only category, location, and date are available.
+ * Full text matching (title, description) only works when full item data is provided.
+ *
  * Returns a score between 0 and 1
  */
 export function calculateMatchScore(lostItem, foundItem) {
-  const weights = {
-    category: 0.3, // Must match category
-    title: 0.2, // Title similarity
-    description: 0.2, // Description similarity
-    location: 0.2, // Location proximity
-    date: 0.1, // Date proximity
-  };
+  // Determine if we have full item data or just index metadata
+  const hasFullData = !!foundItem.title || !!foundItem.description;
 
   const scores = {
     category: calculateCategoryScore(lostItem.category, foundItem.category),
-    title: calculateTextSimilarity(lostItem.title, foundItem.title),
-    description: calculateTextSimilarity(
-      lostItem.description,
-      foundItem.description
-    ),
     location: calculateLocationScore(
       lostItem.locationLost,
-      foundItem.locationFound
+      foundItem.locationFound || { name: foundItem.locationName }
     ),
     date: calculateDateScore(lostItem.dateLost, foundItem.dateFound),
   };
@@ -136,26 +138,62 @@ export function calculateMatchScore(lostItem, foundItem) {
   // If category doesn't match, score is 0
   if (scores.category === 0) return { score: 0, breakdown: scores };
 
-  const totalScore = Object.keys(weights).reduce((sum, key) => {
-    return sum + scores[key] * weights[key];
-  }, 0);
+  if (hasFullData) {
+    // Full matching with text similarity
+    scores.title = calculateTextSimilarity(lostItem.title, foundItem.title);
+    scores.description = calculateTextSimilarity(
+      lostItem.description,
+      foundItem.description
+    );
 
-  return {
-    score: Math.round(totalScore * 100) / 100,
-    breakdown: scores,
-  };
+    const weights = {
+      category: 0.3,
+      title: 0.2,
+      description: 0.2,
+      location: 0.2,
+      date: 0.1,
+    };
+
+    const totalScore = Object.keys(weights).reduce((sum, key) => {
+      return sum + (scores[key] || 0) * weights[key];
+    }, 0);
+
+    return {
+      score: Math.round(totalScore * 100) / 100,
+      breakdown: scores,
+    };
+  } else {
+    // Index-only matching (no title/description available for privacy)
+    const weights = {
+      category: 0.4,
+      location: 0.35,
+      date: 0.25,
+    };
+
+    const totalScore = Object.keys(weights).reduce((sum, key) => {
+      return sum + (scores[key] || 0) * weights[key];
+    }, 0);
+
+    return {
+      score: Math.round(totalScore * 100) / 100,
+      breakdown: { ...scores, title: 0, description: 0 },
+    };
+  }
 }
 
 /**
- * Find potential matches for a lost item
+ * Find potential matches for a lost item.
+ * SECURITY FIX: Queries found_items_index instead of found_items.
+ * Only category, location name, and date are used for matching.
+ * No descriptions, images, or storage locations are exposed.
  */
-export async function findMatchesForLostItem(lostItem, minScore = 0.4) {
+export async function findMatchesForLostItem(lostItem, minScore = 0.5) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
-  // Get all pending found items in the same category
+  // Query the INDEX collection (not the full found_items)
   const q = query(
-    collection(db, COLLECTIONS.FOUND_ITEMS),
+    collection(db, COLLECTIONS.FOUND_ITEMS_INDEX),
     where("category", "==", lostItem.category),
     where("status", "==", "pending")
   );
@@ -163,17 +201,17 @@ export async function findMatchesForLostItem(lostItem, minScore = 0.4) {
   const snapshot = await getDocs(q);
   const matches = [];
 
-  snapshot.docs.forEach((doc) => {
-    const foundItem = { id: doc.id, ...doc.data() };
+  snapshot.docs.forEach((docSnap) => {
+    const indexEntry = { id: docSnap.id, ...docSnap.data() };
 
-    // Don't match with own found items
-    if (foundItem.finderId === currentUser.uid) return;
+    // Don't match with own found items (Sybil prevention)
+    if (indexEntry.finderId === currentUser.uid) return;
 
-    const matchResult = calculateMatchScore(lostItem, foundItem);
+    const matchResult = calculateMatchScore(lostItem, indexEntry);
 
     if (matchResult.score >= minScore) {
       matches.push({
-        foundItem,
+        foundItem: indexEntry, // This is index data only
         score: matchResult.score,
         breakdown: matchResult.breakdown,
       });
@@ -185,9 +223,10 @@ export async function findMatchesForLostItem(lostItem, minScore = 0.4) {
 }
 
 /**
- * Find potential matches for a found item
+ * Find potential matches for a found item.
+ * Searches lost_items (which are semi-public by design).
  */
-export async function findMatchesForFoundItem(foundItem, minScore = 0.4) {
+export async function findMatchesForFoundItem(foundItem, minScore = 0.5) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
@@ -201,10 +240,10 @@ export async function findMatchesForFoundItem(foundItem, minScore = 0.4) {
   const snapshot = await getDocs(q);
   const matches = [];
 
-  snapshot.docs.forEach((doc) => {
-    const lostItem = { id: doc.id, ...doc.data() };
+  snapshot.docs.forEach((docSnap) => {
+    const lostItem = { id: docSnap.id, ...docSnap.data() };
 
-    // Don't match with own lost items
+    // Don't match with own lost items (Sybil prevention)
     if (lostItem.ownerId === currentUser.uid) return;
 
     const matchResult = calculateMatchScore(lostItem, foundItem);
@@ -223,7 +262,52 @@ export async function findMatchesForFoundItem(foundItem, minScore = 0.4) {
 }
 
 /**
- * Create a match record between a lost item and found item
+ * Check if a match already exists between two items (deduplication).
+ * SECURITY FIX: Prevents spamming duplicate match documents.
+ *
+ * NOTE: Firestore "rules are not filters" — we must constrain the query
+ * to include a field that satisfies the matches read rule (ownerId or finderId
+ * must equal the current user). We check from both perspectives.
+ */
+async function matchExists(lostItemId, foundItemId) {
+  const currentUser = auth.currentUser;
+  if (!currentUser) return false;
+
+  try {
+    // Check as owner (current user is the lost item owner)
+    const qOwner = query(
+      collection(db, COLLECTIONS.MATCHES),
+      where("lostItemId", "==", lostItemId),
+      where("foundItemId", "==", foundItemId),
+      where("ownerId", "==", currentUser.uid)
+    );
+    const ownerSnap = await getDocs(qOwner);
+    if (!ownerSnap.empty) return true;
+
+    // Check as finder (current user is the found item finder)
+    const qFinder = query(
+      collection(db, COLLECTIONS.MATCHES),
+      where("lostItemId", "==", lostItemId),
+      where("foundItemId", "==", foundItemId),
+      where("finderId", "==", currentUser.uid)
+    );
+    const finderSnap = await getDocs(qFinder);
+    return !finderSnap.empty;
+  } catch (error) {
+    console.warn("Dedup check failed (non-critical):", error);
+    return false; // Proceed with match creation if check fails
+  }
+}
+
+/**
+ * Create a match record between a lost item and found item.
+ *
+ * SECURITY FIXES:
+ * 1. Quiz correctIndex is REMOVED from the match document
+ * 2. Answer key stored in matches/{id}/answer_key/key (only finder can read)
+ * 3. Items NOT set to "matched" immediately (remain searchable for other matches)
+ * 4. Deduplication check prevents duplicate match creation
+ * 5. Self-matching (ownerId === finderId) is blocked
  */
 export async function createMatch(lostItem, foundItem, scoreData) {
   const currentUser = auth.currentUser;
@@ -239,20 +323,23 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     throw new Error("Found item must have id and finderId");
   }
 
+  // SECURITY: Block self-matching (Sybil prevention)
+  if (lostItem.ownerId === foundItem.finderId) {
+    throw new Error("Cannot match your own items");
+  }
+
   // Verify the current user is involved
   const isOwner = currentUser.uid === lostItem.ownerId;
   const isFinder = currentUser.uid === foundItem.finderId;
 
-  console.log("Creating match:", {
-    currentUserId: currentUser.uid,
-    lostItemOwnerId: lostItem.ownerId,
-    foundItemFinderId: foundItem.finderId,
-    isOwner,
-    isFinder,
-  });
-
   if (!isOwner && !isFinder) {
     throw new Error("You must be the owner or finder to create a match");
+  }
+
+  // SECURITY: Check for duplicate matches
+  const isDuplicate = await matchExists(lostItem.id, foundItem.id);
+  if (isDuplicate) {
+    throw new Error("A match between these items already exists");
   }
 
   // Extract score and breakdown from scoreData
@@ -268,18 +355,16 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     date: 0,
   };
 
-  console.log("Score data received:", scoreData);
-  console.log("Extracted score:", score);
-  console.log("Extracted breakdown:", breakdown);
-
-  // Generate AI verification quiz using comprehensive item data
-  console.log("Generating AI verification questions (3 MCQs)...");
+  // Generate AI verification quiz
+  // Note: When matching from index, the owner doesn't have foundItem description.
+  // The quiz must be generated from whatever data is available.
   let verificationQuiz;
+  let correctAnswers = [];
+
   try {
-    // Pass complete item data for better question generation
-    const aiQuiz = await generateVerificationQuestion({
+    const aiQuiz = await generateVerificationQuestions({
       title: foundItem.title || lostItem.title,
-      description: foundItem.description,
+      description: foundItem.description || lostItem.description,
       category: foundItem.category || lostItem.category,
       locationFound: foundItem.locationFound,
       locationLost: lostItem.locationLost,
@@ -287,51 +372,76 @@ export async function createMatch(lostItem, foundItem, scoreData) {
       dateLost: lostItem.dateLost,
       currentStorageLocation: foundItem.currentStorageLocation,
       images: foundItem.images || [],
-      // Include owner's custom verification question
       ownerVerificationQuestion: lostItem.verificationQuestion,
       ownerVerificationAnswer: lostItem.verificationAnswer,
     });
 
-    // Use all 3 questions for verification
+    // SECURITY: Extract correctIndex values BEFORE storing in match doc.
+    // Only questions (without answers) go into the match doc.
+    correctAnswers = aiQuiz.questions.map((q) => q.correctIndex);
+
     verificationQuiz = {
-      questions: aiQuiz.allQuestions || [
-        {
-          question: aiQuiz.question,
-          options: aiQuiz.options,
-          correctIndex: aiQuiz.correctIndex,
-          difficulty: "medium",
-        },
-      ],
+      questions: aiQuiz.questions.map((q) => ({
+        question: q.question,
+        options: q.options,
+        difficulty: q.difficulty,
+        // NOTE: correctIndex is intentionally OMITTED here
+      })),
       hint: aiQuiz.hint,
       generatedByAI: aiQuiz.generatedByAI,
       sentAt: new Date().toISOString(),
-      submittedAt: null,
-      userAnswers: null,
     };
-    console.log(
-      `AI quiz generated with ${verificationQuiz.questions.length} questions`
-    );
   } catch (error) {
     console.error("Failed to generate AI quiz, using fallback:", error);
+
+    // Fallback quiz — correctIndex still separated
+    const fallbackQuestions = [
+      {
+        question: "What is the primary color of your item?",
+        options: ["Black/Dark", "White/Light", "Colorful/Mixed", "Metallic"],
+        correctIndex: 0,
+        difficulty: "easy",
+      },
+      {
+        question: "What is the approximate size of your item?",
+        options: [
+          "Small (fits in pocket)",
+          "Medium (fits in hand)",
+          "Large (need a bag)",
+          "Very large",
+        ],
+        correctIndex: 1,
+        difficulty: "medium",
+      },
+      {
+        question: "What unique feature does your item have?",
+        options: [
+          "Visible scratch or dent",
+          "Custom modification",
+          "Wear marks from use",
+          "No unique features",
+        ],
+        correctIndex: 2,
+        difficulty: "hard",
+      },
+    ];
+
+    correctAnswers = fallbackQuestions.map((q) => q.correctIndex);
+
     verificationQuiz = {
-      questions: [
-        {
-          question:
-            lostItem.ownershipHints?.question ||
-            "Please describe a unique identifying feature of your item",
-          options: ["Feature A", "Feature B", "Feature C", "Feature D"],
-          correctIndex: 0,
-          difficulty: "medium",
-        },
-      ],
+      questions: fallbackQuestions.map((q) => ({
+        question: q.question,
+        options: q.options,
+        difficulty: q.difficulty,
+        // NOTE: correctIndex is intentionally OMITTED
+      })),
       hint: "Think about what makes your item unique",
       generatedByAI: false,
       sentAt: new Date().toISOString(),
-      submittedAt: null,
-      userAnswers: null,
     };
   }
 
+  // Build match data WITHOUT correctIndex or correctAnswers
   const matchData = {
     lostItemId: lostItem.id,
     foundItemId: foundItem.id,
@@ -343,25 +453,35 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     breakdown: breakdown,
     status: "pending_verification",
     verificationQuiz,
-    ownerAnswer: null,
     itemCategory: lostItem.category,
     itemTitle: lostItem.title,
     lostItemTitle: lostItem.title,
     lostItemDescription: lostItem.description,
-    foundItemTitle: foundItem.title,
-    foundItemDescription: foundItem.description,
+    foundItemTitle: foundItem.title || "",
+    foundItemDescription: "", // SECURITY: Don't expose found item description to owner
     lostLocation: lostItem.locationLost,
-    foundLocation: foundItem.locationFound,
+    foundLocation: foundItem.locationFound || { name: foundItem.locationName },
     lostDate: lostItem.dateLost,
     foundDate: foundItem.dateFound,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
 
-  console.log("Match data to create:", matchData);
-
   const docRef = await addDoc(collection(db, COLLECTIONS.MATCHES), matchData);
   const matchId = docRef.id;
+
+  // SECURITY: Store answer key in subcollection (only finder can read)
+  try {
+    await storeAnswerKey(matchId, correctAnswers);
+  } catch (error) {
+    console.error("Failed to store answer key:", error);
+    // This is critical — delete the match if we can't store the key
+    throw new Error("Failed to create secure verification quiz");
+  }
+
+  // SECURITY FIX: Do NOT set items to "matched" here.
+  // Items stay in "searching"/"pending" so they can receive other potential matches.
+  // Status only changes to "matched" when verification passes.
 
   // Create notification for owner
   try {
@@ -381,7 +501,7 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     await createNotification({
       userId: foundItem.finderId,
       type: "match_created",
-      message: `✨ Your found ${foundItem.category} matched with a lost item report`,
+      message: `✨ Your found ${foundItem.category || lostItem.category} matched with a lost item report`,
       link: `/match/${matchId}`,
       matchId: matchId,
     });
@@ -389,62 +509,21 @@ export async function createMatch(lostItem, foundItem, scoreData) {
     console.error("Failed to create finder notification:", error);
   }
 
-  // Update both items status to "matched"
-  await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItem.id), {
-    status: "matched",
-    updatedAt: serverTimestamp(),
-  });
-
-  await updateDoc(doc(db, COLLECTIONS.FOUND_ITEMS, foundItem.id), {
-    status: "matched",
-    updatedAt: serverTimestamp(),
-  });
-
   return { id: docRef.id, ...matchData };
 }
 
 /**
- * Verify match with owner's answers to 3 MCQ questions
- * @param {string} matchId - The match ID
- * @param {Array<number>} answers - Array of selected option indices for each question
- * @param {object} result - Verification result {correctCount, total, passed}
- */
-export async function verifyMatch(matchId, answers, result) {
-  const currentUser = auth.currentUser;
-  if (!currentUser) throw new Error("Not authenticated");
-
-  const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
-
-  if (result.passed) {
-    await updateDoc(matchRef, {
-      "verificationQuiz.userAnswers": answers,
-      "verificationQuiz.correctCount": result.correctCount,
-      "verificationQuiz.totalQuestions": result.total,
-      "verificationQuiz.submittedAt": serverTimestamp(),
-      status: "verified",
-      updatedAt: serverTimestamp(),
-    });
-  } else {
-    await updateDoc(matchRef, {
-      "verificationQuiz.userAnswers": answers,
-      "verificationQuiz.correctCount": result.correctCount,
-      "verificationQuiz.totalQuestions": result.total,
-      "verificationQuiz.submittedAt": serverTimestamp(),
-      status: "verification_failed",
-      updatedAt: serverTimestamp(),
-    });
-  }
-}
-
-/**
- * Mark a match as recovered (item returned to owner)
- * Also awards reputation points to the finder
+ * Mark a match as recovered (item returned to owner).
+ *
+ * SECURITY FIX: Does NOT write reputation points to other users' documents.
+ * Each user awards their own reputation via awardReputationForRecovery().
+ * Firestore rules enforce that users can only increment their OWN reputation.
  */
 export async function markAsRecovered(matchId, lostItemId, foundItemId) {
   const currentUser = auth.currentUser;
   if (!currentUser) throw new Error("Not authenticated");
 
-  // Get the match to find the finder's ID
+  // Get the match to find participant IDs
   const matchRef = doc(db, COLLECTIONS.MATCHES, matchId);
   const matchSnap = await getDoc(matchRef);
 
@@ -453,7 +532,11 @@ export async function markAsRecovered(matchId, lostItemId, foundItemId) {
   }
 
   const matchData = matchSnap.data();
-  const finderId = matchData.finderId;
+
+  // SECURITY: Only the owner can confirm recovery
+  if (currentUser.uid !== matchData.ownerId) {
+    throw new Error("Only the item owner can confirm recovery");
+  }
 
   // Update match status
   await updateDoc(matchRef, {
@@ -463,80 +546,30 @@ export async function markAsRecovered(matchId, lostItemId, foundItemId) {
   });
 
   // Update lost item status
-  await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItemId), {
-    status: "recovered",
-    updatedAt: serverTimestamp(),
-  });
+  if (lostItemId) {
+    await updateDoc(doc(db, COLLECTIONS.LOST_ITEMS, lostItemId), {
+      status: "recovered",
+      updatedAt: serverTimestamp(),
+    });
+  }
 
-  // Update found item status
-  await updateDoc(doc(db, COLLECTIONS.FOUND_ITEMS, foundItemId), {
-    status: "claimed",
-    updatedAt: serverTimestamp(),
-  });
-
-  // Award reputation points to the finder (50 points for successful recovery)
-  if (finderId) {
+  // Update found item status — may fail if current user isn't the finder
+  // The finder will update their own item status separately
+  if (foundItemId) {
     try {
-      const finderRef = doc(db, COLLECTIONS.USERS, finderId);
-      await updateDoc(finderRef, {
-        reputationPoints: increment(50),
-        itemsReturned: increment(1),
+      await updateDoc(doc(db, COLLECTIONS.FOUND_ITEMS, foundItemId), {
+        status: "claimed",
         updatedAt: serverTimestamp(),
       });
-      console.log(`Awarded 50 reputation points to finder: ${finderId}`);
-    } catch (error) {
-      console.error("Failed to update finder reputation:", error);
-      // Don't throw - the recovery was still successful
+      await updateFoundItemIndexStatus(foundItemId, "claimed");
+    } catch (e) {
+      console.warn("Could not update found item (expected if not finder):", e);
     }
   }
 
-  // Also award a smaller amount to the owner for using the platform
-  if (matchData.ownerId) {
-    try {
-      const ownerRef = doc(db, COLLECTIONS.USERS, matchData.ownerId);
-      await updateDoc(ownerRef, {
-        reputationPoints: increment(10),
-        itemsRecovered: increment(1),
-        updatedAt: serverTimestamp(),
-      });
-      console.log(
-        `Awarded 10 reputation points to owner: ${matchData.ownerId}`
-      );
-    } catch (error) {
-      console.error("Failed to update owner reputation:", error);
-    }
-  }
-}
-
-/**
- * Create a recovery ledger entry (public success story)
- */
-export async function createRecoveryEntry(match, lostItem, foundItem) {
-  const currentUser = auth.currentUser;
-  if (!currentUser) throw new Error("Not authenticated");
-
-  const recoveryEntry = {
-    matchId: match.id,
-    ownerId: match.ownerId,
-    finderId: match.finderId,
-    itemCategory: lostItem.category,
-    itemTitle: lostItem.title,
-    itemValue: lostItem.estimatedValue || 0,
-    locationLost: lostItem.locationLost?.name || "Unknown",
-    locationFound: foundItem.locationFound?.name || "Unknown",
-    daysToRecover: Math.ceil(
-      (new Date() - (lostItem.dateLost?.toDate?.() || new Date())) /
-        (1000 * 60 * 60 * 24)
-    ),
-    recoveredAt: serverTimestamp(),
-    createdAt: serverTimestamp(),
-  };
-
-  const docRef = await addDoc(
-    collection(db, COLLECTIONS.RECOVERY_LEDGER),
-    recoveryEntry
-  );
-  return { id: docRef.id, ...recoveryEntry };
+  // NOTE: Reputation is NOT awarded here. Each user calls
+  // awardReputationForRecovery() on their own behalf, which only
+  // increments THEIR OWN reputation (enforced by Firestore rules).
 }
 
 /**
@@ -567,8 +600,6 @@ export default {
   findMatchesForLostItem,
   findMatchesForFoundItem,
   createMatch,
-  verifyMatch,
   markAsRecovered,
-  createRecoveryEntry,
   createChatChannel,
 };

@@ -131,3 +131,26 @@ export const formatRankDisplay = (rank, totalUsers) => {
 
   return `#${rank}`;
 };
+
+// Generate a 4-word random phrase for the Physical Handshake
+export const generateHandshakePhrase = () => {
+  const words = [
+    "Neon", "Quantum", "Tiger", "Cobalt", "Falcon", "Phantom", "Echo",
+    "Crimson", "Velocity", "Delta", "Omega", "Silver", "Midnight",
+    "Cyber", "Matrix", "Dragon", "Phoenix", "Titan", "Vortex", "Apex",
+    "Nova", "Cosmic", "Shadow", "Ghost", "Stellar", "Aurora", "Zenith",
+    "Crystal", "Onyx", "Pulse", "Nebula", "Vector", "Horizon"
+  ];
+  
+  // Get 4 distinct random words
+  const phrase = [];
+  const wordsCopy = [...words];
+  
+  for (let i = 0; i < 4; i++) {
+    const randomIndex = Math.floor(Math.random() * wordsCopy.length);
+    phrase.push(wordsCopy[randomIndex]);
+    wordsCopy.splice(randomIndex, 1);
+  }
+  
+  return phrase;
+};

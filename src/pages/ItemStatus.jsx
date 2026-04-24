@@ -108,7 +108,7 @@ const ItemStatus = () => {
         }
       } else {
         // Try found_items
-        itemData = await getFoundItem(id);
+        itemData = await getFoundItem(id).catch(() => null);
         if (itemData) {
           setItem(itemData);
           setItemType("found");

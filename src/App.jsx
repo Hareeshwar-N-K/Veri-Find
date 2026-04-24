@@ -103,8 +103,15 @@ const App = () => {
               <Route path="/item/:id" element={<ItemStatus />} />
               <Route path="/match/:id" element={<MatchDetails />} />
 
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminPanel />} />
+              {/* Admin Routes - SECURITY FIX: now requires authentication */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminPanel />
+                  </ProtectedRoute>
+                }
+              />
 
               <Route path="/about" element={<AboutPage />} />
               <Route path="/features" element={<AboutPage />} />
