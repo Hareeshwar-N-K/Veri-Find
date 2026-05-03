@@ -20,7 +20,7 @@ import {
 } from "../utils/constants";
 
 const ReportLost = () => {
-  const { user, currentUser } = useAuth();
+  const { user, currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -94,6 +94,18 @@ const ReportLost = () => {
     if (!user) {
       toast.error("Please login to report a lost item");
       navigate("/login");
+      return;
+    }
+
+    if (!userProfile?.phone) {
+      toast.error(
+        <div className="flex flex-col">
+          <span className="font-bold text-amber-500">Phone Number Required</span>
+          <span className="text-sm">Please add a contact number to your profile so the finder can reach you.</span>
+        </div>,
+        { duration: 4000 }
+      );
+      navigate("/profile");
       return;
     }
 

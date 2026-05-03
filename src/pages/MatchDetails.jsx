@@ -35,6 +35,8 @@ import {
   awardReputationForRecovery,
   createRecoveryEntry,
 } from "../services/firestore";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/config";
 import LoadingSpinner from "../components/LoadingSpinner";
 import toast from "react-hot-toast";
 
@@ -65,6 +67,8 @@ const MatchDetail = () => {
   const [handshakeInput2, setHandshakeInput2] = useState("");
   const [handshakeVerified, setHandshakeVerified] = useState(false);
   const [handshakeError, setHandshakeError] = useState(false);
+  const [ownerContact, setOwnerContact] = useState(null);
+  const [finderContact, setFinderContact] = useState(null);
 
   useEffect(() => {
     fetchMatch();
@@ -95,6 +99,20 @@ const MatchDetail = () => {
       }
 
       setMatch(matchData);
+
+      // Fetch contact profiles
+      try {
+        if (matchData.ownerId && matchData.finderId) {
+          const [ownerDoc, finderDoc] = await Promise.all([
+            getDoc(doc(db, "users", matchData.ownerId)),
+            getDoc(doc(db, "users", matchData.finderId))
+          ]);
+          if (ownerDoc.exists()) setOwnerContact(ownerDoc.data());
+          if (finderDoc.exists()) setFinderContact(finderDoc.data());
+        }
+      } catch (err) {
+        console.error("Error fetching contact info:", err);
+      }
 
       // Fetch full item details if breakdown or locations are missing
       if (
@@ -970,7 +988,7 @@ const MatchDetail = () => {
             )}
 
             {/* Contact Information */}
-            {(isOwner || isFinder) && (
+            {(isOwner || isFinder) && (match.status === "verified" || match.status === "recovered") && (
               <div
                 className={`bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 transition-all duration-1000 ${
                   isVisible
@@ -983,25 +1001,39 @@ const MatchDetail = () => {
                   Contact Information
                 </h2>
                 <div className="space-y-4">
-                  <div className="p-4 bg-white/5 rounded-xl">
-                    <p className="text-sm text-gray-400">Owner</p>
-                    <p className="font-medium">{match.ownerName}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Contact to arrange pickup
-                    </p>
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-sm text-cyan-400 font-bold mb-1">Owner</p>
+                    <p className="font-medium text-lg">{match.ownerName}</p>
+                    {ownerContact?.phone ? (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <a href={`tel:${ownerContact.phone}`} className="flex items-center gap-2 text-sm text-white bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/30 px-3 py-2 rounded-lg transition-colors">
+                          📞 {ownerContact.phone}
+                        </a>
+                        <a href={`mailto:${ownerContact.email}`} className="flex items-center gap-2 text-sm text-white bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-2 rounded-lg transition-colors">
+                          ✉️ {ownerContact.email}
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">Contact to arrange pickup</p>
+                    )}
                   </div>
-                  <div className="p-4 bg-white/5 rounded-xl">
-                    <p className="text-sm text-gray-400">Finder</p>
-                    <p className="font-medium">{match.finderName}</p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Has possession of item
-                    </p>
+                  <div className="p-4 bg-white/5 rounded-xl border border-white/5">
+                    <p className="text-sm text-purple-400 font-bold mb-1">Finder</p>
+                    <p className="font-medium text-lg">{match.finderName}</p>
+                    {finderContact?.phone ? (
+                      <div className="mt-3 flex flex-col gap-2">
+                        <a href={`tel:${finderContact.phone}`} className="flex items-center gap-2 text-sm text-white bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 px-3 py-2 rounded-lg transition-colors">
+                          📞 {finderContact.phone}
+                        </a>
+                        <a href={`mailto:${finderContact.email}`} className="flex items-center gap-2 text-sm text-white bg-white/10 hover:bg-white/20 border border-white/10 px-3 py-2 rounded-lg transition-colors">
+                          ✉️ {finderContact.email}
+                        </a>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500 mt-1">Has possession of item</p>
+                    )}
                   </div>
                 </div>
-                <button className="group w-full mt-4 flex items-center justify-center gap-3 px-4 py-3 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 backdrop-blur-sm border border-cyan-500/30 text-cyan-300 rounded-xl hover:border-cyan-400 transition-all duration-300">
-                  <FiMessageCircle className="group-hover:scale-110 transition-transform" />
-                  Send Message
-                </button>
               </div>
             )}
 
