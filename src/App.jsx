@@ -105,7 +105,7 @@ const App = () => {
 
               {/* Admin Routes - SECURITY FIX: now requires authentication */}
               <Route
-                path="/admin"
+                path="/admin/*"
                 element={
                   <ProtectedRoute>
                     <AdminPanel />

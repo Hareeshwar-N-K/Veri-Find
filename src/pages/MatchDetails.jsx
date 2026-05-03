@@ -60,6 +60,12 @@ const MatchDetail = () => {
   const [showReportIssue, setShowReportIssue] = useState(false);
   const [reportReason, setReportReason] = useState("");
 
+  // Handshake verification state
+  const [handshakeInput1, setHandshakeInput1] = useState("");
+  const [handshakeInput2, setHandshakeInput2] = useState("");
+  const [handshakeVerified, setHandshakeVerified] = useState(false);
+  const [handshakeError, setHandshakeError] = useState(false);
+
   useEffect(() => {
     fetchMatch();
   }, [id]);
@@ -706,39 +712,113 @@ const MatchDetail = () => {
                   </div>
                 </div>
 
-                <div className="mb-8 p-4 bg-cyan-950/30 rounded-xl border border-cyan-900/50 text-sm text-cyan-200/70 font-mono">
-                  <p className="flex items-start gap-2">
-                    <span className="text-cyan-400 mt-0.5">⚠️</span>
-                    When meeting in person, you must verify the other person by completing this phrase together. Do not hand over the item if they cannot provide their half of the phrase.
-                  </p>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-4 items-center justify-center p-6 bg-black/40 rounded-xl border border-white/5">
-                  {/* Words 1 & 2 (Owner) */}
-                  <div className={`flex gap-3 ${isOwner ? 'opacity-100' : 'opacity-30 blur-sm select-none'}`}>
-                    <div className="px-6 py-3 bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 rounded-lg font-mono text-xl font-bold text-cyan-300 tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.2)]">
-                      {isOwner ? match.handshakePhrase[0].toUpperCase() : 'XXXXXX'}
-                    </div>
-                    <div className="px-6 py-3 bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 rounded-lg font-mono text-xl font-bold text-cyan-300 tracking-widest shadow-[0_0_10px_rgba(6,182,212,0.2)]">
-                      {isOwner ? match.handshakePhrase[1].toUpperCase() : 'XXXXXX'}
-                    </div>
+                {handshakeVerified ? (
+                  /* Success state */
+                  <div className="p-6 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center">
+                    <div className="text-5xl mb-4">✅</div>
+                    <h3 className="text-xl font-bold text-emerald-300 mb-2">Handshake Verified!</h3>
+                    <p className="text-emerald-200/70 text-sm">Both halves of the phrase have been confirmed. It is safe to proceed with the item exchange.</p>
                   </div>
-
-                  <div className="text-cyan-500/50 text-2xl font-light mx-4 md:rotate-0 rotate-90">+</div>
-
-                  {/* Words 3 & 4 (Finder) */}
-                  <div className={`flex gap-3 ${!isOwner ? 'opacity-100' : 'opacity-30 blur-sm select-none'}`}>
-                    <div className="px-6 py-3 bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 rounded-lg font-mono text-xl font-bold text-purple-300 tracking-widest shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                      {!isOwner ? match.handshakePhrase[2].toUpperCase() : 'XXXXXX'}
+                ) : (
+                  /* Verification protocol */
+                  <>
+                    {/* Step 1: Your words — say these aloud */}
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-xs font-bold text-cyan-300">1</div>
+                        <p className="text-sm font-semibold text-cyan-300 uppercase tracking-wider">Say your words aloud to the other person</p>
+                      </div>
+                      <div className="flex gap-3 justify-center p-4 bg-black/40 rounded-xl border border-white/5">
+                        <div className={`px-6 py-3 rounded-lg font-mono text-xl font-bold tracking-widest shadow-lg ${
+                          isOwner 
+                            ? 'bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 text-cyan-300'
+                            : 'bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 text-purple-300'
+                        }`}>
+                          {isOwner ? match.handshakePhrase[0].toUpperCase() : match.handshakePhrase[2].toUpperCase()}
+                        </div>
+                        <div className={`px-6 py-3 rounded-lg font-mono text-xl font-bold tracking-widest shadow-lg ${
+                          isOwner 
+                            ? 'bg-gradient-to-b from-cyan-500/20 to-transparent border-t-2 border-cyan-400 text-cyan-300'
+                            : 'bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 text-purple-300'
+                        }`}>
+                          {isOwner ? match.handshakePhrase[1].toUpperCase() : match.handshakePhrase[3].toUpperCase()}
+                        </div>
+                      </div>
                     </div>
-                    <div className="px-6 py-3 bg-gradient-to-b from-purple-500/20 to-transparent border-t-2 border-purple-400 rounded-lg font-mono text-xl font-bold text-purple-300 tracking-widest shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                      {!isOwner ? match.handshakePhrase[3].toUpperCase() : 'XXXXXX'}
+
+                    {/* Step 2: Type what the other person says */}
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-full bg-purple-500/20 border border-purple-500/40 flex items-center justify-center text-xs font-bold text-purple-300">2</div>
+                        <p className="text-sm font-semibold text-purple-300 uppercase tracking-wider">
+                          Type what the {isOwner ? 'finder' : 'owner'} says to you
+                        </p>
+                      </div>
+                      <div className="flex gap-3 justify-center p-4 bg-black/40 rounded-xl border border-white/5">
+                        <input
+                          type="text"
+                          value={handshakeInput1}
+                          onChange={(e) => { setHandshakeInput1(e.target.value); setHandshakeError(false); }}
+                          placeholder="Word 1"
+                          className={`w-36 px-4 py-3 bg-white/5 border rounded-lg font-mono text-lg text-center text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                            handshakeError ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 focus:ring-cyan-500'
+                          }`}
+                        />
+                        <input
+                          type="text"
+                          value={handshakeInput2}
+                          onChange={(e) => { setHandshakeInput2(e.target.value); setHandshakeError(false); }}
+                          placeholder="Word 2"
+                          className={`w-36 px-4 py-3 bg-white/5 border rounded-lg font-mono text-lg text-center text-white placeholder-gray-500 focus:outline-none focus:ring-2 transition-all ${
+                            handshakeError ? 'border-red-500/50 focus:ring-red-500' : 'border-white/10 focus:ring-cyan-500'
+                          }`}
+                        />
+                      </div>
+                      {handshakeError && (
+                        <p className="text-red-400 text-sm text-center mt-3 font-mono animate-pulse">
+                          ❌ Words do not match. Do NOT hand over the item!
+                        </p>
+                      )}
                     </div>
-                  </div>
-                </div>
+
+                    {/* Verify Button */}
+                    <button
+                      onClick={() => {
+                        const expectedWords = isOwner
+                          ? [match.handshakePhrase[2], match.handshakePhrase[3]]
+                          : [match.handshakePhrase[0], match.handshakePhrase[1]];
+                        const input1 = handshakeInput1.trim().toLowerCase();
+                        const input2 = handshakeInput2.trim().toLowerCase();
+                        if (
+                          input1 === expectedWords[0].toLowerCase() &&
+                          input2 === expectedWords[1].toLowerCase()
+                        ) {
+                          setHandshakeVerified(true);
+                          setHandshakeError(false);
+                          toast.success("Handshake verified! Safe to exchange.");
+                        } else {
+                          setHandshakeError(true);
+                          toast.error("Handshake failed! Words do not match.");
+                        }
+                      }}
+                      disabled={!handshakeInput1.trim() || !handshakeInput2.trim()}
+                      className="w-full py-3 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 rounded-xl font-semibold text-cyan-300 hover:border-cyan-400 hover:text-cyan-200 transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <FaShieldAlt />
+                      Verify Handshake
+                    </button>
+                  </>
+                )}
                 
                 <div className="mt-6 text-center text-xs text-gray-500 font-mono tracking-widest">
-                  YOUR ROLE: <span className={isOwner ? "text-cyan-400" : "text-purple-400"}>{isOwner ? "OWNER (FIRST HALF)" : "FINDER (SECOND HALF)"}</span>
+                  YOUR ROLE: <span className={isOwner ? "text-cyan-400" : "text-purple-400"}>{isOwner ? "OWNER (WORDS 1-2)" : "FINDER (WORDS 3-4)"}</span>
+                </div>
+
+                <div className="mt-4 p-3 bg-cyan-950/30 rounded-xl border border-cyan-900/50 text-xs text-cyan-200/50 font-mono">
+                  <p className="flex items-start gap-2">
+                    <span className="text-cyan-400 mt-0.5">🔒</span>
+                    Each person only sees their own half. You verify the other person by typing what they say. If the words don't match, do NOT exchange the item.
+                  </p>
                 </div>
               </div>
             )}
@@ -797,10 +877,17 @@ const MatchDetail = () => {
                   <FiCheckCircle className="animate-pulse" />
                   Confirm Recovery
                 </h2>
-                <p className="text-sm text-emerald-200/80 mb-6">
-                  Have you successfully received your item from the finder?
-                </p>
-                <div className="space-y-3">
+                {!handshakeVerified ? (
+                  <p className="text-sm text-orange-300/90 mb-6 flex items-start gap-2">
+                    <FiAlertCircle className="mt-0.5" />
+                    Please complete the Zero-Trust Handshake verification first to unlock recovery confirmation.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-emerald-200/80 mb-6">
+                      Have you successfully received your item from the finder?
+                    </p>
+                    <div className="space-y-3">
                   <button
                     onClick={() => handleRecoveryConfirm(true)}
                     disabled={confirming}
@@ -817,7 +904,9 @@ const MatchDetail = () => {
                     <FiXCircle className="group-hover:scale-110 transition-transform" />
                     {confirming ? "Processing..." : "Not Yet"}
                   </button>
-                </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
 

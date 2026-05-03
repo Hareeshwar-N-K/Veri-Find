@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import {
   FiUsers,
   FiPackage,
@@ -58,11 +58,27 @@ ChartJS.register(
 const AdminPanel = () => {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [isAdmin, setIsAdmin] = useState(false);
   const [checkingAdmin, setCheckingAdmin] = useState(true);
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("lost");
+
+  // Route matching
+  const path = location.pathname;
+  const showDashboard = path === "/admin" || path === "/admin/";
+  const showSettings = path === "/admin/settings";
+  const showAnalytics = path === "/admin/analytics";
+  const showItems = path === "/admin/items" || path === "/admin/matches";
+  const showUsers = path === "/admin/users";
+  const showReports = path === "/admin/reports";
+
+  // Effect to sync activeTab with matches route
+  useEffect(() => {
+    if (path === "/admin/matches") setActiveTab("matches");
+    if (path === "/admin/items" && activeTab === "matches") setActiveTab("lost");
+  }, [path]);
 
   // Add new state for login mode
   const [loginMode, setLoginMode] = useState("any"); // 'any' or 'organization'
@@ -486,7 +502,8 @@ const AdminPanel = () => {
         </div>
 
         {/* System Settings Card - NEW */}
-        <div className="bg-white rounded-xl shadow-lg border border-blue-200 mb-8 overflow-hidden">
+        {showSettings && (
+          <div className="bg-white rounded-xl shadow-lg border border-blue-200 mb-8 overflow-hidden">
           <div className="px-6 py-4 border-b border-blue-200 bg-gradient-to-r from-blue-100 to-indigo-100">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-3">
               <FiMail className="w-5 h-5 text-blue-700" />
@@ -653,8 +670,10 @@ const AdminPanel = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Stats Cards */}
+        {showDashboard && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <StatsCard
             icon={<FiAlertCircle className="w-6 h-6" />}
@@ -682,8 +701,10 @@ const AdminPanel = () => {
             color="purple"
           />
         </div>
+        )}
 
         {/* Charts */}
+        {showAnalytics && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-blue-200">
             <div className="flex items-center justify-between mb-6">
@@ -713,8 +734,10 @@ const AdminPanel = () => {
             </div>
           </div>
         </div>
+        )}
 
         {/* Items Table */}
+        {showItems && (
         <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 overflow-hidden">
           {/* Tabs and Search */}
           <div className="px-6 py-4 border-b-2 border-gray-200 bg-gray-50">
@@ -886,8 +909,26 @@ const AdminPanel = () => {
             </table>
           </div>
         </div>
+        )}
+
+        {/* Placeholder for Users */}
+        {showUsers && (
+          <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-12 text-center">
+            <h2 className="text-2xl font-bold text-gray-700">User Management</h2>
+            <p className="text-gray-500 mt-2">This feature is coming soon.</p>
+          </div>
+        )}
+
+        {/* Placeholder for Reports */}
+        {showReports && (
+          <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-12 text-center">
+            <h2 className="text-2xl font-bold text-gray-700">System Reports</h2>
+            <p className="text-gray-500 mt-2">This feature is coming soon.</p>
+          </div>
+        )}
 
         {/* Quick Info Cards */}
+        {showDashboard && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
           <div className="bg-white rounded-xl p-6 shadow-lg border-2 border-green-200">
             <h3 className="font-bold text-gray-900 mb-4 text-lg">
@@ -966,6 +1007,7 @@ const AdminPanel = () => {
             </div>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
